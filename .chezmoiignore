@@ -1,1 +1,40 @@
 **/.git
+
+# Tool-managed authentication (don't sync these)
+.config/gh/                    # GitHub CLI manages tokens
+.config/op/                    # 1Password CLI device auth
+.config/github-copilot/        # Copilot auth tokens
+.docker/config.json            # Docker credential helper
+
+# Large or non-portable configs
+.config/raycast/               # 502MB, use export instead
+
+# Machine-specific
+.kube/                         # Cluster configs
+.config/chezmoi/               # Machine-specific data
+
+# Caches and history
+.zsh_history
+.bash_history
+.zcompdump*
+.lesshst
+.viminfo
+.config/nushell/history.txt
+.config/fish/fish_history
+
+# Backup files
+**/*.backup
+**/*.old
+**/.backup
+
+# Documentation (not needed in dotfiles)
+.config/nvim/LICENSE
+.config/nvim/README.md
+**/README.md
+**/LICENSE
+
+# Compiled/cache files
+**/.DS_Store
+**/__pycache__/
+**/*.pyc
+.config/fish/completions/*.zwc

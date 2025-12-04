@@ -1,0 +1,128 @@
+l
+ls
+lsa
+ls -a
+ps
+ls | sort-by modified
+gs develop
+ls
+http get https://vc-one-app-web-non-prod.non-prod.vc-vcg.engineering.vodafone.com/highlights/integrated
+clear
+http get https://api-non-prod.non-prod.vc-vcg.engineering.vodafone.com/vc-oneapp-highlights/v1/queryHighlightItems?tileIdentifier=USAGE_CONSUMPTION
+http get http://jso
+http get https://my-json-server.typicode.com/typicode/demo/posts
+http get https://my-json-server.typicode.com/typicode/demo/posts | get id
+http get https://my-json-server.typicode.com/typicode/demo/posts | get title where id = 1
+http get https://my-json-server.typicode.com/typicode/demo/posts | get title where id == 1
+fish
+config nu
+$env.EDITOR
+$env.XDG_CONFIG_HOME
+source ~/.config/nushell/config.nu
+source ~/.config/nushell/env.nu
+config nu
+git log
+config nu
+ls
+eza
+gst
+z config
+ls
+rm -rf nvim
+rm -rf ~/.cache/nvim
+rm -rf ~/.local/share/nvim/
+git clone https://github.com/LazyVim/starter ~/.config/nvim
+rm -rf ~/.config/nvim/.git
+nvim
+yazi
+brew install yazi ffmpeg sevenzip jq poppler fd ripgrep fzf zoxide resvg imagemagick font-symbols-only-nerd-font
+yazi
+nvim ~/.config/tmux/tmux.conf 
+tmux attach-session 
+purge
+git fetch -p origin
+gl
+git pull
+git branch ls
+git branch -a
+git branch -a | fzf
+git log --oneline 
+git branch -a | fzf
+git log --oneline 
+use git branch --sort=-committerdate
+git branch --sort=-committerdate
+git checkout feat/hey-api-integration 
+grhh
+git reset --hard
+git checkout feat/hey-api-integration 
+git log --oneline 
+git checkout refactor/types-deps 
+git log --oneline 
+git reset HEAD~1
+git commit -v
+git push origin refactor/types-deps
+git push origin refactor/types-deps --no-verify
+gemini
+brew upgrade && gemini
+brew upgrade; gemini
+gemini
+clear
+cd ../
+git clone https://VFCloudEngineering@dev.azure.com/VFCloudEngineering/CICD/_git/cep-cicd-framework
+cep-cicd-framework/\
+cd cep-cicd-framework/
+tmux
+tmux attach
+tmux attach VOIS
+tmux attach-session VOIS
+tmux list-sessions 
+brew upgrade gemini-cli; gemini
+gemini
+gst
+git status
+git commit
+git push origin refactor/types-deps --no-verify
+git fetch -p origin
+git checkout develop
+git pull
+http get 'https://dev.onecms.vodacom.com/api/v1/buy-bundle?market_code=tz&user_type=POSTPAID' --headers {x-api-key:30440b24-b4c4-4e91-85b3-5e69c03dea63}
+claude
+brew upgrade gemini-cli; gemini
+purge
+ls
+lsa
+z ds
+z web
+git log --oneline 
+git log
+git log --oneline | table
+wq
+git log --oneline | tv
+tv git
+tv git-log
+cargo --version<\n>bun --version<\n>?? ls -la          # Copilot explain<\n># Press Ctrl+T     # Television fuzzy finder
+cargo --version 
+bun --version 
+ps
+ps aux
+help commands | explore
+$env.config | explore
+ls
+ll
+ls -l
+tree
+ls -t
+ls -lt
+tree -L 2
+eza -lt
+tv git-diff
+tv git-diff develop
+git-diff develop
+git diff develop
+git diff develop | tv
+nvim ~/.claude/plans/cozy-noodling-octopus.md
+gst
+gfa
+lear
+clear
+fnm ls

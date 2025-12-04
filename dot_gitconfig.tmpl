@@ -1,0 +1,37 @@
+[user]
+	name = {{ .git_name }}
+	email = {{ .git_work_email }}
+[pull]
+	rebase = false
+[core]
+	editor = code-insiders --wait
+	excludesfile = {{ .chezmoi.homeDir }}/.gitignore_global
+
+[delta]
+    navigate = true  # use n and N to move between diff sections
+    dark = true      # or light = true, or omit for auto-detection
+	side-by-side = true
+[merge]
+  conflictStyle = zdiff3
+[difftool]
+    # Run the difftool immediately, don't ask 'are you sure' each time.
+    prompt = false
+
+[pager]
+    # Use a pager if the difftool output is larger than one screenful,
+    # consistent with the behaviour of `git diff`.
+    difftool = true
+
+[diff]
+    # Set difftastic as the default difftool, so we don't need to specify
+    # `-t difftastic` every time.
+    tool = difftastic
+
+# --- Personal Projects Override ---
+# Any repo in these directories uses personal email instead of work email
+
+[includeIf "gitdir:~/personal/"]
+	path = ~/.gitconfig-personal
+
+[includeIf "gitdir:~/dotfiles/"]
+	path = ~/.gitconfig-personal
