@@ -9,6 +9,9 @@
 # Large or non-portable configs
 .config/raycast/               # 502MB, use export instead
 
+# Plugin managers handle these
+.config/tmux/plugins/          # TPM manages tmux plugins
+
 # Machine-specific
 .kube/                         # Cluster configs
 .config/chezmoi/               # Machine-specific data
