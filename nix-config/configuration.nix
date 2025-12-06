@@ -10,6 +10,7 @@
   # Homebrew integration
   homebrew = {
     enable = true;
+    user = "islam.shehata";  # Run Homebrew as user, not root
     onActivation = {
       autoUpdate = false;
       cleanup = "none";  # Safe mode - won't remove existing packages
