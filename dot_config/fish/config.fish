@@ -11,11 +11,13 @@ if status is-interactive
     # Initialize starship prompt
     starship init fish | source
 
+    # Initialize atuin (history sync)
+    atuin init fish | source
+
     # Configure transient prompt - shows only character module
     function starship_transient_prompt_func
         starship module character
-        atuin init fish | source
-end
+    end
 
     # Configure right-side transient prompt - shows time module
     function starship_transient_rprompt_func

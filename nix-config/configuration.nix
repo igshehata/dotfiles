@@ -17,7 +17,7 @@
     };
 
     taps = [
-      "homebrew/cask-fonts"
+      # homebrew/cask-fonts deprecated - fonts now in main cask
     ];
 
     # CLI tools (keeping in brew for now, can migrate to nix later)
@@ -121,14 +121,12 @@
       "font-lilex-nerd-font"
       "font-m+-nerd-font"
       "font-martian-mono-nerd-font"
-      "font-monaspace-nerd-font"
       "font-monaspice-nerd-font"
       "font-monocraft-nerd-font"
       "font-monofur-nerd-font"
       "font-monoid-nerd-font"
       "font-mononoki-nerd-font"
       "font-noto-nerd-font"
-      "font-open-dyslexic-nerd-font"
       "font-opendyslexic-nerd-font"
       "font-overpass-nerd-font"
       "font-profont-nerd-font"
@@ -149,11 +147,23 @@
   };
 
   # Enable Touch ID for sudo
-  security.pam.enableSudoTouchIdAuth = true;
+  security.pam.services.sudo_local.touchIdAuth = true;
 
   # Shell configuration
   programs.fish.enable = true;
   programs.zsh.enable = true;
+  # nushell installed via brew, config managed by chezmoi
+
+  # Default shell (fish)
+  environment.shells = [ pkgs.fish ];
+  users.users."islam.shehata" = {
+    shell = pkgs.fish;
+  };
+
+  # macOS System Defaults
+  system.defaults = {
+    dock.autohide = true;
+  };
 
   # Nix settings
   nix.settings = {
@@ -161,7 +171,8 @@
   };
 
   # Required
-  services.nix-daemon.enable = true;
+  ids.gids.nixbld = 350;  # Determinate installer uses 350, not 30000
+  system.primaryUser = "islam.shehata";
   system.stateVersion = 4;
   nixpkgs.hostPlatform = "aarch64-darwin";
 }
