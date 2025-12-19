@@ -28,7 +28,7 @@
       "bash"
       "bat"
       "biome"
-      "bun"
+      "oven-sh/bun/bun"
       "carapace"
       "chezmoi"
       "commitizen"

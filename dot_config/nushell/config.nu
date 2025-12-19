@@ -34,16 +34,12 @@ use ~/.config/nushell/git-aliases.nu *
 # Aliases
 # ============================================================================
 alias ci = code-insiders
-alias ag = agy
 alias ?? = aichat
-alias ls = eza -l --no-permissions --icons --git
-alias ll = eza -la --no-permissions --icons --git
-alias la = eza -a --icons --git
 alias lt = eza -T --no-permissions --icons --level=2 --git
 alias llt = eza -lT --no-permissions --icons --level=2 --git
 alias py = python3
 alias pip = pip3
-
+alias nv = nvim
 # ============================================================================
 # Television (tv) - Smart Autocomplete with Fuzzy Finding
 # Ctrl+T: Fuzzy find files, directories, and commands

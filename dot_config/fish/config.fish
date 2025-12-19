@@ -34,9 +34,9 @@ if status is-interactive
     # Initialize carapace completions
     carapace _carapace | source
 
-    alias ci 'code-insiders'
-    alias ag 'agy'
-    alias ?? 'aichat'
+    alias ci code-insiders
+    alias nv nvim
+    alias ?? aichat
     alias ls 'eza -l --no-permissions --icons --git'
     alias ll 'eza -la --no-permissions --icons --git'
     alias la 'eza -a --icons --git'
