@@ -18,6 +18,9 @@
 # them for future reference.
 $env.EDITOR = 'nvim'
 
+# Nix darwin system binaries
+$env.PATH = ($env.PATH | split row (char esep) | prepend '/run/current-system/sw/bin')
+
 # Initialize fnm (Fast Node Manager)
 fnm env --json | from json | load-env
 $env.PATH = ($env.PATH | split row (char esep) | prepend $"($env.FNM_MULTISHELL_PATH)/bin")
@@ -35,3 +38,4 @@ $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join 
 # Bun - Add Bun runtime to PATH
 # ============================================================================
 $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join '.bun' 'bin'))
+zoxide init nushell | save -f ~/.zoxide.nu

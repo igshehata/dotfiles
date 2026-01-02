@@ -3,7 +3,7 @@
 {
   # Nix packages (CLI tools)
   environment.systemPackages = with pkgs; [
-    git
+    yazi    ripgrep    bat    git
     neovim
   ];
 
@@ -26,7 +26,6 @@
       "aichat"
       "atuin"
       "bash"
-      "bat"
       "biome"
       "oven-sh/bun/bun"
       "carapace"
@@ -48,18 +47,15 @@
       "kind"
       "lua"
       "luajit"
-      "neovim"
       "node"
       "nushell"
       "openjdk"
       "pinentry"
       "pnpm"
       "python@3.13"
-      "ripgrep"
       "starship"
       "tmux"
       "tree"
-      "yazi"
       "zoxide"
     ];
 
@@ -147,8 +143,11 @@
     ];
   };
 
-  # Enable Touch ID for sudo
-  security.pam.services.sudo_local.touchIdAuth = true;
+  # Enable Touch ID for sudo (reattach enables it inside tmux/screen)
+  security.pam.services.sudo_local = {
+    touchIdAuth = true;
+    reattach = true;
+  };
 
   # Shell configuration
   programs.fish.enable = true;

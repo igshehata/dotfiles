@@ -40,6 +40,8 @@ alias llt = eza -lT --no-permissions --icons --level=2 --git
 alias py = python3
 alias pip = pip3
 alias nv = nvim
+# Nix darwin (requires sudo since May 2025 - Phase 1 of multi-user support)
+alias drs = sudo darwin-rebuild switch --flake ~/nix-config#igshehata
 # ============================================================================
 # Television (tv) - Smart Autocomplete with Fuzzy Finding
 # Ctrl+T: Fuzzy find files, directories, and commands
@@ -82,3 +84,69 @@ $env.config = (
       ]
   )
 )
+source ~/.zoxide.nu
+
+# ============================================================================
+# Nix Helpers
+# ============================================================================
+
+# nix add <packages...> - Add packages to nix configuration
+def "nix add" [...packages: string] {
+    if ($packages | is-empty) {
+        print "Usage: nix add <package1> [package2] ..."
+        return
+    }
+
+    let config_file = $"($env.HOME)/nix-config/configuration.nix"
+
+    for pkg in $packages {
+        ^sed -i '' $"/environment.systemPackages = with pkgs; \\[/a\\\n    ($pkg)" $config_file
+        print $"Added ($pkg) to configuration.nix"
+    }
+
+    print ""
+    print "Next: drs; chezmoi re-add ~/nix-config/configuration.nix"
+}
+
+# nix dedupe - Remove brews that exist in nix packages
+def "nix dedupe" [] {
+    let config_file = $"($env.HOME)/nix-config/configuration.nix"
+    let content = open $config_file
+
+    # Extract nix packages
+    let nix_pkgs = ($content
+        | parse --regex '(?s)environment\.systemPackages = with pkgs; \[([^\]]+)\]'
+        | get capture0
+        | first
+        | split row "\n"
+        | each { str trim }
+        | where { $in != "" and not ($in | str starts-with "#") }
+    )
+
+    # Extract brews
+    let brews = ($content
+        | parse --regex '(?s)brews = \[([^\]]+)\]'
+        | get capture0
+        | first
+        | split row "\n"
+        | each { str trim | str replace -a '"' '' }
+        | where { $in != "" and not ($in | str starts-with "#") }
+    )
+
+    mut found = 0
+    for pkg in $nix_pkgs {
+        if $pkg in $brews {
+            ^sed -i '' $"/brews = \\[/,/\\];/{ /\"($pkg)\"/d; }" $config_file
+            print $"Removed '($pkg)' from brews \(exists in nix packages\)"
+            $found = $found + 1
+        }
+    }
+
+    if $found == 0 {
+        print "No duplicates found"
+    } else {
+        print ""
+        print $"Removed ($found) duplicate\(s\)"
+        print "Next: drs; chezmoi re-add ~/nix-config/configuration.nix"
+    }
+}
