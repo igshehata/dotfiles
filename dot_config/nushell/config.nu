@@ -18,6 +18,61 @@
 #     config nu --doc | nu-highlight | less -R
 $env.config.edit_mode = 'vi'
 
+def "parse vars" [] {
+  $in | from csv --noheaders --no-infer | rename 'op' 'name' 'value'
+}
+
+def --env "update-env" [] {
+  for $var in $in {
+    if $var.op == "set" {
+      if ($var.name | str upcase) == 'PATH' {
+        $env.PATH = ($var.value | split row (char esep))
+      } else {
+        load-env {($var.name): $var.value}
+      }
+    } else if $var.op == "hide" and $var.name in $env {
+      hide-env $var.name
+    }
+  }
+}
+
+def --env add-hook [field: cell-path new_hook: any] {
+  let field = $field | split cell-path | update optional true | into cell-path
+  let old_config = $env.config? | default {}
+  let old_hooks = $old_config | get $field | default []
+  $env.config = ($old_config | upsert $field ($old_hooks ++ [$new_hook]))
+}
+
+def --env mise_hook [] {
+  ^mise hook-env -s nu
+    | parse vars
+    | update-env
+}
+
+def --env --wrapped mise [command?: string, --help, ...rest: string] {
+  let commands = ["deactivate", "shell", "sh"]
+
+  if ($command == null) {
+    ^mise
+  } else if ($command == "activate") {
+    $env.MISE_SHELL = "nu"
+  } else if ($command in $commands) {
+    ^mise $command ...$rest
+      | parse vars
+      | update-env
+  } else {
+    ^mise $command ...$rest
+  }
+}
+
+$env.MISE_SHELL = "nu"
+let mise_hook = {
+  condition: { "MISE_SHELL" in $env }
+  code: { mise_hook }
+}
+add-hook hooks.pre_prompt $mise_hook
+add-hook hooks.env_change.PWD $mise_hook
+
 # Transient prompt configuration
 $env.TRANSIENT_PROMPT_COMMAND = {|| starship module character }
 $env.TRANSIENT_PROMPT_COMMAND_RIGHT = {|| starship module time }
@@ -29,6 +84,22 @@ source ~/.local/share/atuin/init.nu
 # Git Aliases (from nu_scripts)
 # ============================================================================
 use ~/.config/nushell/git-aliases.nu *
+
+# Git push: "git push<Tab>" completes to "origin <current-branch>"
+$env.config.completions.external.completer = {|spans|
+    if ($spans | length) >= 2 and $spans.0 == "git" and $spans.1 == "push" {
+        let branch = (do { ^git branch --show-current } | complete)
+        if $branch.exit_code == 0 {
+            let b = ($branch.stdout | str trim)
+            [{value: $"origin ($b)", description: "push current branch"}]
+        } else {
+            null
+        }
+    } else {
+        # Fall back to carapace for everything else
+        carapace $spans.0 nushell ...$spans | from json
+    }
+}
 
 # ============================================================================
 # Aliases
@@ -81,6 +152,22 @@ $env.config = (
                   cmd: "tv_smart_autocomplete"
               }
           }
+          # Option+Backspace: delete word backward
+          {
+              name: backward_delete_word,
+              modifier: Alt,
+              keycode: Backspace,
+              mode: [vi_normal, vi_insert, emacs],
+              event: { edit: BackspaceWord }
+          }
+          # Command+Backspace: delete to start of line
+          {
+              name: delete_to_line_start,
+              modifier: Super,
+              keycode: Backspace,
+              mode: [vi_normal, vi_insert, emacs],
+              event: { edit: CutFromLineStart }
+          }
       ]
   )
 )
@@ -90,18 +177,33 @@ source ~/.zoxide.nu
 # Nix Helpers
 # ============================================================================
 
-# nix add <packages...> - Add packages to nix configuration
-def "nix add" [...packages: string] {
+# nix add [--brew|--cask] <packages...> - Add packages to nix configuration
+def "nix add" [
+    --brew    # Add to Homebrew brews instead of nix packages
+    --cask    # Add to Homebrew casks instead of nix packages
+    ...packages: string
+] {
     if ($packages | is-empty) {
-        print "Usage: nix add <package1> [package2] ..."
+        print "Usage: nix add [--brew|--cask] <package1> [package2] ..."
+        print "  (default)  Add to nix packages"
+        print "  --brew     Add to Homebrew brews"
+        print "  --cask     Add to Homebrew casks"
         return
     }
 
     let config_file = $"($env.HOME)/nix-config/configuration.nix"
 
     for pkg in $packages {
-        ^sed -i '' $"/environment.systemPackages = with pkgs; \\[/a\\\n    ($pkg)" $config_file
-        print $"Added ($pkg) to configuration.nix"
+        if $cask {
+            ^sed -i '' $"/casks = \\[/a\\\n      \"($pkg)\"" $config_file
+            print $"Added ($pkg) to casks"
+        } else if $brew {
+            ^sed -i '' $"/brews = \\[/a\\\n      \"($pkg)\"" $config_file
+            print $"Added ($pkg) to brews"
+        } else {
+            ^sed -i '' $"/environment.systemPackages = with pkgs; \\[/a\\\n    ($pkg)" $config_file
+            print $"Added ($pkg) to nix packages"
+        }
     }
 
     print ""

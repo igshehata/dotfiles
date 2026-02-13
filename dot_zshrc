@@ -171,3 +171,4 @@ fi
 eval "$(atuin init zsh)"
 
 . "$HOME/.local/bin/env"
+eval "$(mise activate zsh)"
