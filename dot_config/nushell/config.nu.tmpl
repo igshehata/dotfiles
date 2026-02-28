@@ -112,7 +112,7 @@ alias py = python3
 alias pip = pip3
 alias nv = nvim
 # Nix darwin (requires sudo since May 2025 - Phase 1 of multi-user support)
-alias drs = sudo darwin-rebuild switch --flake ~/nix-config#igshehata
+alias drs = sudo darwin-rebuild switch --flake ~/nix-config#{{ .chezmoi.hostname }}
 # ============================================================================
 # Television (tv) - Smart Autocomplete with Fuzzy Finding
 # Ctrl+T: Fuzzy find files, directories, and commands

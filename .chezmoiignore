@@ -26,9 +26,15 @@
 .config/fish/fish_history
 
 # Backup files
+**/*.bak
 **/*.backup
+**/*.backup.*
 **/*.old
 **/.backup
+
+# Upstream repo artifacts (prevent cloned repos from bloating dotfiles)
+**/imgs/
+**/.github/
 
 # Documentation (not needed in dotfiles)
 .config/nvim/LICENSE

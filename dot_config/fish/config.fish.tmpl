@@ -84,7 +84,7 @@ if status is-interactive
     alias pip=pip3
 
     # Nix darwin (requires sudo since May 2025 - Phase 1 of multi-user support)
-    abbr --add drs 'sudo darwin-rebuild switch --flake ~/nix-config#igshehata'
+    abbr --add drs 'sudo darwin-rebuild switch --flake ~/nix-config#{{ .chezmoi.hostname }}'
 end
 
 # nix add/dedupe - Nix configuration helpers

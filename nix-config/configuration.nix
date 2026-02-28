@@ -1,11 +1,8 @@
 { pkgs, ... }:
 
 {
-  # Nix packages (CLI tools)
-  environment.systemPackages = with pkgs; [
-    zig        neofetch    pandoc    trivy    yazi    ripgrep    bat    git
-    neovim
-  ];
+  # Nix packages (CLI tools) — moved to homebrew.brews for portability
+  environment.systemPackages = with pkgs; [];
 
   # Homebrew integration
   homebrew = {
@@ -58,6 +55,16 @@
       "tree"
       "zoxide"
       "opencode"
+      "zig"
+      "neofetch"
+      "pandoc"
+      "trivy"
+      "yazi"
+      "ripgrep"
+      "bat"
+      "neovim"
+      "television"
+      "rustup"
     ];
 
     # GUI apps
