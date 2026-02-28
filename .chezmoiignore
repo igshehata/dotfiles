@@ -1,4 +1,6 @@
 **/.git
+bootv4.sh
+nix-config/
 
 # Tool-managed authentication (don't sync these)
 .config/gh/                    # GitHub CLI manages tokens
