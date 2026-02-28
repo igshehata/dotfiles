@@ -192,40 +192,52 @@ phase_3() {
     if grep -q "user = \"$CURRENT_USER\"" "$config_nix"; then
         skip "homebrew.user already set to $CURRENT_USER"
     else
-        local old_user
-        old_user=$(grep -oP 'user = "\K[^"]+' "$config_nix" | head -1)
-        sed -i '' "s/user = \"$old_user\"/user = \"$CURRENT_USER\"/" "$config_nix"
-        success "homebrew.user: $old_user -> $CURRENT_USER"
+        sed -E -i '' "s|(^[[:space:]]*user[[:space:]]*=[[:space:]]*\")[^\"]*(\".*$)|\\1$CURRENT_USER\\2|" "$config_nix"
+        if grep -q "user = \"$CURRENT_USER\"" "$config_nix"; then
+            success "homebrew.user set to $CURRENT_USER"
+        else
+            fail "Failed to set homebrew.user"
+            return 1
+        fi
     fi
 
     # 2. users.users."..." in configuration.nix
     if grep -q "users.users.\"$CURRENT_USER\"" "$config_nix"; then
         skip "users.users already set to $CURRENT_USER"
     else
-        local old_nix_user
-        old_nix_user=$(grep -oP 'users\.users\.\"\K[^"]+' "$config_nix" | head -1)
-        sed -i '' "s/users.users.\"$old_nix_user\"/users.users.\"$CURRENT_USER\"/" "$config_nix"
-        success "users.users: $old_nix_user -> $CURRENT_USER"
+        sed -E -i '' "s|(users\.users\.\")[^\"]*(\")|\\1$CURRENT_USER\\2|" "$config_nix"
+        if grep -q "users.users.\"$CURRENT_USER\"" "$config_nix"; then
+            success "users.users set to $CURRENT_USER"
+        else
+            fail "Failed to set users.users"
+            return 1
+        fi
     fi
 
     # 3. system.primaryUser in configuration.nix
     if grep -q "system.primaryUser = \"$CURRENT_USER\"" "$config_nix"; then
         skip "system.primaryUser already set to $CURRENT_USER"
     else
-        local old_primary
-        old_primary=$(grep -oP 'system\.primaryUser = "\K[^"]+' "$config_nix" | head -1)
-        sed -i '' "s/system.primaryUser = \"$old_primary\"/system.primaryUser = \"$CURRENT_USER\"/" "$config_nix"
-        success "system.primaryUser: $old_primary -> $CURRENT_USER"
+        sed -E -i '' "s|(^[[:space:]]*system\.primaryUser[[:space:]]*=[[:space:]]*\")[^\"]*(\".*$)|\\1$CURRENT_USER\\2|" "$config_nix"
+        if grep -q "system.primaryUser = \"$CURRENT_USER\"" "$config_nix"; then
+            success "system.primaryUser set to $CURRENT_USER"
+        else
+            fail "Failed to set system.primaryUser"
+            return 1
+        fi
     fi
 
     # 4. darwinConfigurations."..." in flake.nix
     if grep -q "darwinConfigurations.\"$HOSTNAME\"" "$flake_nix"; then
         skip "darwinConfigurations already set to $HOSTNAME"
     else
-        local old_host
-        old_host=$(grep -oP 'darwinConfigurations\."\K[^"]+' "$flake_nix" | head -1)
-        sed -i '' "s/darwinConfigurations.\"$old_host\"/darwinConfigurations.\"$HOSTNAME\"/" "$flake_nix"
-        success "darwinConfigurations: $old_host -> $HOSTNAME"
+        sed -E -i '' "s|(darwinConfigurations\.\")[^\"]*(\")|\\1$HOSTNAME\\2|" "$flake_nix"
+        if grep -q "darwinConfigurations.\"$HOSTNAME\"" "$flake_nix"; then
+            success "darwinConfigurations set to $HOSTNAME"
+        else
+            fail "Failed to set darwinConfigurations host"
+            return 1
+        fi
     fi
 
 }
@@ -243,13 +255,26 @@ phase_4() {
         warn "Homebrew not found — Nix/darwin-rebuild will install it"
     else
         info "Updating Homebrew..."
-        brew update
-        info "Upgrading existing packages..."
-        brew upgrade
+        brew update || warn "brew update failed — continuing"
+        info "Upgrading existing formulae (skipping casks to avoid stale app-link failures)..."
+        brew upgrade --formula || warn "brew formula upgrade failed — continuing"
     fi
 
-    info "Running darwin-rebuild switch --flake ~/nix-config#$HOSTNAME ..."
-    sudo darwin-rebuild switch --flake "$NIX_CONFIG#$HOSTNAME" </dev/tty
+    local rebuild_host="$HOSTNAME"
+    if ! grep -q "darwinConfigurations.\"$rebuild_host\"" "$NIX_CONFIG/flake.nix"; then
+        local detected_host
+        detected_host=$(sed -nE 's/^[[:space:]]*darwinConfigurations\."([^"]+)".*/\1/p' "$NIX_CONFIG/flake.nix" | head -1)
+        if [[ -n "$detected_host" ]]; then
+            warn "Flake host '$rebuild_host' not found; using '$detected_host' from flake.nix"
+            rebuild_host="$detected_host"
+        else
+            fail "No darwinConfigurations entry found in $NIX_CONFIG/flake.nix"
+            return 1
+        fi
+    fi
+
+    info "Running darwin-rebuild switch --flake ~/nix-config#$rebuild_host ..."
+    sudo darwin-rebuild switch --flake "$NIX_CONFIG#$rebuild_host" </dev/tty
     local rebuild_rc=$?
 
     if [[ $rebuild_rc -ne 0 ]]; then
@@ -263,6 +288,11 @@ phase_4() {
     hash -r
 
     success "darwin-rebuild completed"
+
+    local has_brew=0
+    if command -v brew &>/dev/null; then
+        has_brew=1
+    fi
 
     # Verify formulas by brew install state OR command availability in PATH
     # (some tools are intentionally installed via Nix and won't appear in brew list)
@@ -285,7 +315,7 @@ phase_4() {
         local formula="${check%%:*}"
         local cmd="${check##*:}"
 
-        if brew list --formula "$formula" &>/dev/null || command -v "$cmd" &>/dev/null; then
+        if { [[ $has_brew -eq 1 ]] && brew list --formula "$formula" &>/dev/null; } || command -v "$cmd" &>/dev/null; then
             track "Brews" "$formula" "pass"
         else
             track "Brews" "$formula" "fail"
@@ -300,7 +330,7 @@ phase_4() {
     )
 
     for cask in "${casks[@]}"; do
-        if brew list --cask "$cask" &>/dev/null; then
+        if [[ $has_brew -eq 1 ]] && brew list --cask "$cask" &>/dev/null; then
             track "Casks" "$cask" "pass"
         else
             track "Casks" "$cask" "fail"
@@ -309,7 +339,7 @@ phase_4() {
     done
 
     # Ghostty cask can be installed while app bundle is missing from /Applications.
-    if brew list --cask ghostty &>/dev/null && [[ ! -d "/Applications/Ghostty.app" ]]; then
+    if [[ $has_brew -eq 1 ]] && brew list --cask ghostty &>/dev/null && [[ ! -d "/Applications/Ghostty.app" ]]; then
         warn "Ghostty cask is installed but /Applications/Ghostty.app is missing — reinstalling cask"
         brew reinstall --cask ghostty || warn "Ghostty reinstall failed"
     fi
@@ -632,23 +662,16 @@ phase_9() {
         return 1
     fi
 
-    # If already logged in, don't destroy local state; just sync.
-    if atuin status 2>/dev/null | grep -q "session"; then
-        skip "Atuin already logged in"
-        info "Running force sync..."
-        atuin sync -f
-        success "Atuin synced"
-        return 0
-    fi
-
     # Hard reset requested: clear local Atuin data and auth/session state.
     info "Performing hard reset of local Atuin state..."
     atuin account logout >/dev/null 2>&1 || true
     rm -rf "$HOME/.local/share/atuin"
     rm -rf "$HOME/.config/atuin"
+    mkdir -p "$HOME/.config/atuin"
 
     # Rehydrate atuin config from chezmoi (sync_key comes from 1Password template).
-    if ! chezmoi apply "$HOME/.config/atuin/config.toml" </dev/tty; then
+    # Use --force to avoid interactive "changed since chezmoi last wrote it" prompts.
+    if ! chezmoi apply --force "$HOME/.config/atuin/config.toml"; then
         fail "Failed to apply atuin config with chezmoi"
         return 1
     fi
@@ -663,7 +686,15 @@ phase_9() {
     local atuin_key=""
 
     if [[ -f "$atuin_config" ]]; then
-        atuin_key=$(awk -F'"' '/^sync_key/{print $2}' "$atuin_config")
+        atuin_key=$(python3 - <<'PY'
+from pathlib import Path
+import re
+p = Path.home() / '.config' / 'atuin' / 'config.toml'
+text = p.read_text() if p.exists() else ''
+m = re.search(r'^\s*sync_key\s*=\s*(["\'])(.*)\1\s*$', text, re.M)
+print(m.group(2) if m else '')
+PY
+)
     fi
 
     if [[ -z "$atuin_key" || "$atuin_key" == *"{{"* || "$atuin_key" == *"onepassword"* ]]; then
@@ -687,16 +718,56 @@ phase_9() {
     fi
 
     info "Running force sync..."
-    atuin sync -f
+    local sync_output
+    sync_output="$(atuin sync -f 2>&1)"
+    local sync_rc=$?
 
-    if atuin status 2>/dev/null | grep -q "session"; then
+    if [[ $sync_rc -eq 0 ]]; then
         success "Atuin synced"
         track "Shell" "atuin sync" "pass"
-    else
-        fail "Atuin sync is still not healthy"
+        return 0
+    fi
+
+    if [[ "$sync_output" == *"attempting to decrypt with incorrect key"* ]]; then
+        warn "Atuin detected remote records encrypted with a different key"
+
+        local backup_dir="$HOME/atuin-backups"
+        local backup_ts
+        backup_ts="$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$backup_dir"
+        atuin history list > "$backup_dir/atuin-history-$backup_ts.txt" 2>/dev/null || true
+        tar -czf "$backup_dir/atuin-state-$backup_ts.tgz" -C "$HOME" .local/share/atuin .config/atuin/config.toml 2>/dev/null || true
+        info "Created Atuin safety backup in $backup_dir"
+
+        if confirm "Overwrite remote Atuin store with current local history to repair mixed keys?"; then
+            info "Rebuilding remote Atuin store from local data..."
+            if ! atuin store push --force </dev/tty; then
+                fail "Failed to push repaired Atuin store to remote"
+                track "Shell" "atuin sync" "fail"
+                return 1
+            fi
+
+            atuin sync -f >/dev/null 2>&1
+            local repair_rc=$?
+            if [[ $repair_rc -eq 0 ]]; then
+                success "Atuin synced after remote store repair"
+                track "Shell" "atuin sync" "pass"
+                return 0
+            fi
+
+            fail "Atuin sync still failing after remote repair"
+            track "Shell" "atuin sync" "fail"
+            return 1
+        fi
+
+        fail "Mixed-key Atuin records remain (repair was skipped)"
         track "Shell" "atuin sync" "fail"
         return 1
     fi
+
+    fail "Atuin sync failed"
+    track "Shell" "atuin sync" "fail"
+    return 1
 
 }
 
