@@ -223,6 +223,8 @@ phase_4() {
     else
         info "Updating Homebrew..."
         brew update
+        info "Upgrading existing packages..."
+        brew upgrade
     fi
 
     info "Running darwin-rebuild switch --flake ~/nix-config#$HOSTNAME ..."
@@ -370,42 +372,108 @@ phase_6() {
 }
 
 # ============================================================================
-# Phase 7: SSH key setup
+# Phase 7: SSH Key Setup + chezmoi remote switch
 # ============================================================================
 phase_7() {
-    info "Phase 7: SSH key setup"
+    info "Phase 7: SSH Key Setup"
 
-    if [[ -f "$HOME/.ssh/id_ed25519" ]]; then
-        skip "SSH key already exists"
-        # Ensure it's in the agent
-        ssh-add "$HOME/.ssh/id_ed25519" 2>/dev/null || true
-        mark_done "phase_7"
-        return 0
+    # Test if SSH to GitHub already works
+    local ssh_test
+    ssh_test="$(ssh -T git@github.com 2>&1 || true)"
+    if [[ "$ssh_test" == *"successfully authenticated"* ]]; then
+        success "SSH to GitHub already works"
+        track "SSH" "github" "pass"
+    else
+        info "SSH to GitHub is not configured yet."
+        echo ""
+        echo "  1) Use 1Password SSH Agent (recommended if you use 1P for SSH keys)"
+        echo "  2) Generate a new local SSH key"
+        echo "  3) Skip SSH setup for now"
+        echo ""
+        local ssh_choice
+        printf "Choice [1/2/3]: " >/dev/tty
+        tty_read -r ssh_choice
+
+        case "$ssh_choice" in
+            1)
+                info "Setting up 1Password SSH Agent..."
+                mkdir -p "$HOME/.ssh"
+
+                local ssh_config="$HOME/.ssh/config"
+                if [[ ! -f "$ssh_config" ]] || ! grep -q "IdentityAgent" "$ssh_config" 2>/dev/null; then
+                    cat >> "$ssh_config" <<'SSHEOF'
+
+# 1Password SSH Agent
+Host *
+  IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+SSHEOF
+                    chmod 600 "$ssh_config"
+                    success "SSH config updated with 1Password IdentityAgent"
+                else
+                    success "SSH config already has IdentityAgent"
+                fi
+
+                info "Make sure 'Use the SSH Agent' is enabled in 1Password > Settings > Developer"
+                confirm "Press y after verifying 1Password SSH Agent is enabled"
+
+                ssh_test="$(ssh -T git@github.com 2>&1 || true)"
+                if [[ "$ssh_test" == *"successfully authenticated"* ]]; then
+                    success "SSH via 1Password Agent works!"
+                    track "SSH" "github" "pass"
+                else
+                    warn "SSH test failed. You may need to add your GitHub SSH key in 1Password."
+                    track "SSH" "github" "fail"
+                fi
+                ;;
+            2)
+                info "Generating ed25519 SSH key..."
+                local ssh_email
+                printf "Email for SSH key: " >/dev/tty
+                tty_read -r ssh_email
+                ssh-keygen -t ed25519 -C "$ssh_email" -f "$HOME/.ssh/id_ed25519" </dev/tty
+                eval "$(ssh-agent -s)"
+                ssh-add "$HOME/.ssh/id_ed25519"
+
+                echo ""
+                info "Add this public key to GitHub (https://github.com/settings/keys):"
+                echo ""
+                cat "$HOME/.ssh/id_ed25519.pub"
+                echo ""
+
+                confirm "Press y after adding the key to GitHub"
+                ssh_test="$(ssh -T git@github.com 2>&1 || true)"
+                if [[ "$ssh_test" == *"successfully authenticated"* ]]; then
+                    success "SSH key works!"
+                    track "SSH" "github" "pass"
+                else
+                    warn "SSH test failed. Continuing — you can fix this later."
+                    track "SSH" "github" "fail"
+                fi
+                ;;
+            *)
+                info "Skipping SSH setup. You can configure it later."
+                mark_done "phase_7"
+                return 0
+                ;;
+        esac
     fi
 
-    local email
-    printf "Email for SSH key: " >/dev/tty
-    tty_read -r email
+    # Switch chezmoi remote from HTTPS to SSH
+    local current_remote
+    current_remote="$(git -C "$CHEZMOI_SOURCE" remote get-url origin 2>/dev/null || true)"
+    local ssh_remote="git@github.com:${DOTFILES_REPO#https://github.com/}"
+    # Normalize: strip .git if present in both
+    ssh_remote="${ssh_remote%.git}.git"
 
-    info "Generating ed25519 SSH key..."
-    ssh-keygen -t ed25519 -C "$email" </dev/tty
-
-    ssh-add "$HOME/.ssh/id_ed25519"
-    pbcopy < "$HOME/.ssh/id_ed25519.pub"
-
-    success "SSH key generated and public key copied to clipboard"
-    info "Add this key to GitHub: https://github.com/settings/keys"
-
-    if confirm "Press y after adding the key to GitHub to test connection"; then
-        local ssh_output
-        ssh_output=$(ssh -T git@github.com 2>&1 || true)
-        if [[ "$ssh_output" == *"successfully authenticated"* ]]; then
-            success "GitHub SSH authentication works"
-            track "SSH" "github" "pass"
-        else
-            warn "GitHub SSH test: $ssh_output"
-            track "SSH" "github" "fail"
-        fi
+    if [[ "$current_remote" == git@* ]]; then
+        success "chezmoi remote already uses SSH"
+    elif [[ "$ssh_test" == *"successfully authenticated"* ]]; then
+        info "Switching chezmoi remote from HTTPS to SSH..."
+        git -C "$CHEZMOI_SOURCE" remote set-url origin "$ssh_remote"
+        success "chezmoi remote switched to $ssh_remote"
+    else
+        info "SSH not working yet — keeping HTTPS remote. Switch later with:"
+        info "  git -C $CHEZMOI_SOURCE remote set-url origin $ssh_remote"
     fi
 
     mark_done "phase_7"
@@ -480,12 +548,23 @@ phase_9() {
     local atuin_key=""
 
     if [[ -f "$atuin_config" ]]; then
-        atuin_key=$(awk -F'"' '/^key/{print $2}' "$atuin_config")
+        atuin_key=$(awk -F'"' '/^sync_key/{print $2}' "$atuin_config")
     fi
 
-    if [[ -z "$atuin_key" || "$atuin_key" == *"{{"* ]]; then
-        warn "No valid atuin sync key found in $atuin_config"
-        warn "Skipping atuin sync — fix the key and re-run Phase 9"
+    # If key is missing or still a template placeholder, try re-running chezmoi
+    # (the template needs 1Password CLI signed in to hydrate)
+    if [[ -z "$atuin_key" || "$atuin_key" == *"{{"* || "$atuin_key" == *"onepassword"* ]]; then
+        warn "Atuin sync key not hydrated — attempting chezmoi apply for atuin config..."
+        if op whoami &>/dev/null; then
+            chezmoi apply "$HOME/.config/atuin/config.toml" </dev/tty 2>/dev/null
+            atuin_key=$(awk -F'"' '/^sync_key/{print $2}' "$atuin_config")
+        else
+            warn "1Password CLI not signed in — cannot hydrate atuin sync key"
+        fi
+    fi
+
+    if [[ -z "$atuin_key" || "$atuin_key" == *"{{"* || "$atuin_key" == *"onepassword"* ]]; then
+        fail "No valid atuin sync key — sign into 1Password (Phase 5) and re-run: bash bootv4.sh --from-phase 9"
         mark_done "phase_9"
         return 0
     fi

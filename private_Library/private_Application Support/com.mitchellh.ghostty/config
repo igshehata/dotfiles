@@ -1,0 +1,11 @@
+keybind = cmd+left=previous_tab
+keybind = cmd+right=next_tab
+
+theme = tokyonight
+shell-integration = fish
+background-blur-radius = 20
+window-decoration = true
+
+#background-opacity = 0.9
+#background-blur-radius = 20
+command = /opt/homebrew/bin/fish
