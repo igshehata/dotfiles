@@ -9,13 +9,13 @@ set -uo pipefail
 # ============================================================================
 # Configuration
 # ============================================================================
-STATE_FILE="$HOME/.bootv4-state"
 CHEZMOI_SOURCE="$HOME/.local/share/chezmoi"
 NIX_CONFIG="$HOME/nix-config"
 DOTFILES_REPO="https://github.com/igshehata/dotfiles.git"
 CURRENT_USER="$(whoami)"
 HOSTNAME="$(hostname -s)"
 START_PHASE=0
+FINAL_PHASE=10
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -31,6 +31,16 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if ! [[ "$START_PHASE" =~ ^[0-9]+$ ]]; then
+    printf "[FAIL] --from-phase must be a number\n"
+    return 1
+fi
+
+if [[ "$START_PHASE" -lt 0 || "$START_PHASE" -gt "$FINAL_PHASE" ]]; then
+    printf "[FAIL] --from-phase must be between 0 and %s\n" "$FINAL_PHASE"
+    return 1
+fi
 
 # ============================================================================
 # Helper Functions
@@ -51,9 +61,6 @@ confirm() {
     [[ "$response" =~ ^[Yy] ]]
 }
 
-phase_done()   { grep -qx "$1" "$STATE_FILE" 2>/dev/null; }
-mark_done()    { echo "$1" >> "$STATE_FILE"; }
-
 # Result tracking for Phase 10 verification
 RESULTS=()
 track() { RESULTS+=("$1|$2|$3"); }  # category|name|pass/fail
@@ -63,14 +70,22 @@ should_run() {
     [[ "$phase_num" -ge "$START_PHASE" ]]
 }
 
-# When --from-phase is used, clear state for those phases so they actually re-run
-if [[ "$START_PHASE" -gt 0 ]]; then
-    if [[ -f "$STATE_FILE" ]]; then
-        for i in $(seq "$START_PHASE" 10); do
-            sed -i '' "/^phase_${i}$/d" "$STATE_FILE" 2>/dev/null || true
-        done
+run_phase() {
+    local phase_num="$1"
+    local phase_fn="$2"
+
+    if should_run "$phase_num"; then
+        "$phase_fn"
     fi
-fi
+}
+
+cleanup_legacy_state() {
+    local legacy_state_file="$HOME/.bootv4-state"
+    if [[ -f "$legacy_state_file" ]]; then
+        rm -f "$legacy_state_file"
+        info "Removed legacy state tracker: $legacy_state_file"
+    fi
+}
 
 # ============================================================================
 # Phase 0: Prerequisites (Xcode CLT)
@@ -80,7 +95,6 @@ phase_0() {
 
     if xcode-select -p &>/dev/null; then
         skip "Xcode CLT already installed"
-        mark_done "phase_0"
         return 0
     fi
 
@@ -94,7 +108,6 @@ phase_0() {
     done
 
     success "Xcode CLT installed"
-    mark_done "phase_0"
 }
 
 # ============================================================================
@@ -105,7 +118,6 @@ phase_1() {
 
     if command -v nix &>/dev/null; then
         skip "Nix already installed ($(nix --version))"
-        mark_done "phase_1"
         return 0
     fi
 
@@ -120,7 +132,6 @@ phase_1() {
 
     if command -v nix &>/dev/null; then
         success "Nix installed ($(nix --version))"
-        mark_done "phase_1"
     else
         fail "Nix installation failed — 'nix' not found in PATH"
         return 1
@@ -138,7 +149,6 @@ phase_2() {
         # Pull latest changes
         info "Pulling latest changes..."
         git -C "$CHEZMOI_SOURCE" pull --ff-only 2>/dev/null || warn "Could not pull (offline or conflict)"
-        mark_done "phase_2"
         return 0
     fi
 
@@ -153,7 +163,6 @@ phase_2() {
 
     if [[ -d "$CHEZMOI_SOURCE/.git" ]]; then
         success "Dotfiles cloned to $CHEZMOI_SOURCE"
-        mark_done "phase_2"
     else
         fail "Failed to clone dotfiles"
         return 1
@@ -166,11 +175,15 @@ phase_2() {
 phase_3() {
     info "Phase 3: Configure nix-config for $CURRENT_USER@$HOSTNAME"
 
-    # Copy nix-config from chezmoi source if not already present
-    if [[ ! -d "$NIX_CONFIG" ]]; then
-        info "Copying nix-config from chezmoi source..."
-        cp -r "$CHEZMOI_SOURCE/nix-config" "$NIX_CONFIG"
+    if [[ ! -d "$CHEZMOI_SOURCE/nix-config" ]]; then
+        fail "Missing nix-config in $CHEZMOI_SOURCE"
+        return 1
     fi
+
+    info "Syncing nix-config from chezmoi source..."
+    mkdir -p "$NIX_CONFIG"
+    cp "$CHEZMOI_SOURCE/nix-config/configuration.nix" "$NIX_CONFIG/configuration.nix"
+    cp "$CHEZMOI_SOURCE/nix-config/flake.nix" "$NIX_CONFIG/flake.nix"
 
     local config_nix="$NIX_CONFIG/configuration.nix"
     local flake_nix="$NIX_CONFIG/flake.nix"
@@ -215,7 +228,6 @@ phase_3() {
         success "darwinConfigurations: $old_host -> $HOSTNAME"
     fi
 
-    mark_done "phase_3"
 }
 
 # ============================================================================
@@ -252,26 +264,32 @@ phase_4() {
 
     success "darwin-rebuild completed"
 
-    # Verify packages
-    info "Verifying brew packages..."
-    local brews=(
-        mise direnv aichat atuin bash biome carapace chezmoi commitizen
-        difftastic eza fd ffmpeg fish fnm fzf gemini-cli gh gnupg go jq
-        k6 kind lua luajit node nushell openjdk pinentry pnpm starship
-        tmux tree zoxide opencode zig neofetch pandoc trivy yazi ripgrep
-        bat neovim television rustup
+    # Verify formulas by brew install state OR command availability in PATH
+    # (some tools are intentionally installed via Nix and won't appear in brew list)
+    info "Verifying CLI tools are available..."
+    local formula_checks=(
+        "mise:mise" "direnv:direnv" "aichat:aichat" "atuin:atuin" "bash:bash"
+        "biome:biome" "carapace:carapace" "chezmoi:chezmoi" "commitizen:cz"
+        "difftastic:difft" "eza:eza" "fd:fd" "ffmpeg:ffmpeg" "fish:fish"
+        "fnm:fnm" "fzf:fzf" "gemini-cli:gemini-cli" "gh:gh" "gnupg:gpg"
+        "go:go" "jq:jq" "k6:k6" "kind:kind" "lua:lua" "luajit:luajit"
+        "node:node" "nushell:nu" "openjdk:java" "pinentry:pinentry"
+        "pnpm:pnpm" "starship:starship" "tmux:tmux" "tree:tree"
+        "zoxide:zoxide" "opencode:opencode" "zig:zig" "neofetch:neofetch"
+        "pandoc:pandoc" "trivy:trivy" "yazi:yazi" "ripgrep:rg" "bat:bat"
+        "neovim:nvim" "television:tv" "rustup:rustup" "bun:bun"
+        "python@3.13:python3.13"
     )
-    # oven-sh/bun/bun checked separately as "bun"
-    brews+=("bun")
-    # python@3.13 checked as "python@3.13"
-    brews+=("python@3.13")
 
-    for pkg in "${brews[@]}"; do
-        if brew list --formula "$pkg" &>/dev/null; then
-            track "Brews" "$pkg" "pass"
+    for check in "${formula_checks[@]}"; do
+        local formula="${check%%:*}"
+        local cmd="${check##*:}"
+
+        if brew list --formula "$formula" &>/dev/null || command -v "$cmd" &>/dev/null; then
+            track "Brews" "$formula" "pass"
         else
-            track "Brews" "$pkg" "fail"
-            warn "Brew not found: $pkg"
+            track "Brews" "$formula" "fail"
+            warn "Tool not found: $formula (expected command: $cmd)"
         fi
     done
 
@@ -290,7 +308,19 @@ phase_4() {
         fi
     done
 
-    mark_done "phase_4"
+    # Ghostty cask can be installed while app bundle is missing from /Applications.
+    if brew list --cask ghostty &>/dev/null && [[ ! -d "/Applications/Ghostty.app" ]]; then
+        warn "Ghostty cask is installed but /Applications/Ghostty.app is missing — reinstalling cask"
+        brew reinstall --cask ghostty || warn "Ghostty reinstall failed"
+    fi
+
+    if [[ -d "/Applications/Ghostty.app" ]]; then
+        track "Casks" "ghostty app bundle" "pass"
+    else
+        track "Casks" "ghostty app bundle" "fail"
+        warn "Ghostty.app is still missing in /Applications"
+    fi
+
 }
 
 # ============================================================================
@@ -299,9 +329,13 @@ phase_4() {
 phase_5() {
     info "Phase 5: 1Password CLI"
 
+    if ! command -v op &>/dev/null; then
+        fail "1Password CLI (op) is not installed"
+        return 1
+    fi
+
     if op whoami &>/dev/null; then
         skip "1Password CLI already signed in"
-        mark_done "phase_5"
         return 0
     fi
 
@@ -317,7 +351,6 @@ phase_5() {
         warn "1Password CLI sign-in may have failed — continuing anyway"
     fi
 
-    mark_done "phase_5"
 }
 
 # ============================================================================
@@ -346,11 +379,72 @@ phase_6() {
         return 1
     fi
 
+    # Validate 1Password template hydration for Atuin key material.
+    if chezmoi execute-template '{{ onepasswordRead "op://Dev/AtuinSyncKey/notesPlain" }}' &>/dev/null; then
+        success "chezmoi can hydrate 1Password secrets"
+    else
+        warn "1Password secret hydration failed — Atuin sync will fail until this works"
+    fi
+
+    # Nushell on macOS loads from $nu.default-config-dir (usually App Support).
+    # Keep ~/.config/nushell as source-of-truth and link active files to it.
+    if command -v nu &>/dev/null; then
+        local nu_default_dir
+        nu_default_dir="$(nu -c 'print $nu.default-config-dir' 2>/dev/null || true)"
+        if [[ -n "$nu_default_dir" ]]; then
+            mkdir -p "$nu_default_dir"
+            for nu_file in config.nu env.nu; do
+                local src="$HOME/.config/nushell/$nu_file"
+                local dst="$nu_default_dir/$nu_file"
+                if [[ "$src" == "$dst" ]]; then
+                    continue
+                fi
+                if [[ -f "$src" ]]; then
+                    ln -sfn "$src" "$dst"
+                fi
+            done
+            success "Nushell active config now points to ~/.config/nushell"
+        else
+            warn "Could not determine Nushell default config directory"
+        fi
+
+        # Regenerate shell integration init files for Nu autoload path.
+        local nu_data_dir
+        nu_data_dir="$(nu -c 'print $nu.data-dir' 2>/dev/null || true)"
+        if [[ -n "$nu_data_dir" ]]; then
+            local nu_vendor_dir="$nu_data_dir/vendor/autoload"
+            mkdir -p "$nu_vendor_dir"
+
+            command -v starship &>/dev/null && starship init nu > "$nu_vendor_dir/starship.nu"
+            command -v atuin &>/dev/null && atuin init nu > "$nu_vendor_dir/atuin.nu"
+            command -v carapace &>/dev/null && carapace _carapace nushell > "$nu_vendor_dir/carapace.nu"
+            command -v zoxide &>/dev/null && zoxide init nushell > "$nu_vendor_dir/zoxide.nu"
+
+            success "Regenerated Nushell vendor autoload scripts"
+        fi
+    fi
+
+    # Ghostty reads XDG config first, then macOS path; remove legacy file so XDG wins.
+    local ghostty_legacy="$HOME/Library/Application Support/com.mitchellh.ghostty/config"
+    if [[ -f "$ghostty_legacy" ]]; then
+        local ghostty_backup
+        ghostty_backup="${ghostty_legacy}.bootv4.bak.$(date +%Y%m%d%H%M%S)"
+        mv "$ghostty_legacy" "$ghostty_backup"
+        success "Moved legacy Ghostty config to $ghostty_backup"
+    fi
+
+    # Ensure XDG Ghostty path is materialized even on fresh machines.
+    mkdir -p "$HOME/.config/ghostty"
+    chezmoi apply --force "$HOME/.config/ghostty/config" </dev/tty 2>/dev/null || warn "Could not refresh Ghostty XDG config"
+
     # Verify key deployed files
     local configs=(
         "$HOME/.config/fish/config.fish"
         "$HOME/.config/tmux/tmux.conf"
         "$HOME/.config/atuin/config.toml"
+        "$HOME/.config/nushell/config.nu"
+        "$HOME/.config/nushell/env.nu"
+        "$HOME/.config/ghostty/config"
         "$HOME/.config/starship.toml"
         "$HOME/.gitconfig"
     )
@@ -367,7 +461,7 @@ phase_6() {
     # Extra check: atuin config has a real sync key (not a template placeholder)
     if [[ -f "$HOME/.config/atuin/config.toml" ]]; then
         local key_line
-        key_line=$(grep '^key' "$HOME/.config/atuin/config.toml" 2>/dev/null || true)
+        key_line=$(grep '^sync_key' "$HOME/.config/atuin/config.toml" 2>/dev/null || true)
         if [[ -n "$key_line" && ! "$key_line" =~ \{\{ ]]; then
             track "Configs" "atuin sync_key" "pass"
         else
@@ -377,7 +471,6 @@ phase_6() {
     fi
 
     success "chezmoi apply completed"
-    mark_done "phase_6"
 }
 
 # ============================================================================
@@ -461,7 +554,6 @@ SSHEOF
                 ;;
             *)
                 info "Skipping SSH setup. You can configure it later."
-                mark_done "phase_7"
                 return 0
                 ;;
         esac
@@ -485,7 +577,6 @@ SSHEOF
         info "  git -C $CHEZMOI_SOURCE remote set-url origin $ssh_remote"
     fi
 
-    mark_done "phase_7"
 }
 
 # ============================================================================
@@ -528,28 +619,43 @@ phase_8() {
         success "Tmux plugins installed"
     fi
 
-    mark_done "phase_8"
 }
 
 # ============================================================================
-# Phase 9: Atuin sync
+# Phase 9: Atuin hard reset + sync
 # ============================================================================
 phase_9() {
-    info "Phase 9: Atuin sync"
+    info "Phase 9: Atuin hard reset + sync"
 
     if ! command -v atuin &>/dev/null; then
         fail "atuin not found in PATH"
         return 1
     fi
 
-    # Check if already logged in
+    # If already logged in, don't destroy local state; just sync.
     if atuin status 2>/dev/null | grep -q "session"; then
         skip "Atuin already logged in"
         info "Running force sync..."
         atuin sync -f
         success "Atuin synced"
-        mark_done "phase_9"
         return 0
+    fi
+
+    # Hard reset requested: clear local Atuin data and auth/session state.
+    info "Performing hard reset of local Atuin state..."
+    atuin account logout >/dev/null 2>&1 || true
+    rm -rf "$HOME/.local/share/atuin"
+    rm -rf "$HOME/.config/atuin"
+
+    # Rehydrate atuin config from chezmoi (sync_key comes from 1Password template).
+    if ! chezmoi apply "$HOME/.config/atuin/config.toml" </dev/tty; then
+        fail "Failed to apply atuin config with chezmoi"
+        return 1
+    fi
+
+    if ! chezmoi execute-template '{{ onepasswordRead "op://Dev/AtuinSyncKey/notesPlain" }}' &>/dev/null; then
+        fail "1Password secret hydration failed for Atuin sync key"
+        return 1
     fi
 
     # Extract sync key from chezmoi-deployed config
@@ -560,22 +666,9 @@ phase_9() {
         atuin_key=$(awk -F'"' '/^sync_key/{print $2}' "$atuin_config")
     fi
 
-    # If key is missing or still a template placeholder, try re-running chezmoi
-    # (the template needs 1Password CLI signed in to hydrate)
     if [[ -z "$atuin_key" || "$atuin_key" == *"{{"* || "$atuin_key" == *"onepassword"* ]]; then
-        warn "Atuin sync key not hydrated — attempting chezmoi apply for atuin config..."
-        if op whoami &>/dev/null; then
-            chezmoi apply "$HOME/.config/atuin/config.toml" </dev/tty 2>/dev/null
-            atuin_key=$(awk -F'"' '/^sync_key/{print $2}' "$atuin_config")
-        else
-            warn "1Password CLI not signed in — cannot hydrate atuin sync key"
-        fi
-    fi
-
-    if [[ -z "$atuin_key" || "$atuin_key" == *"{{"* || "$atuin_key" == *"onepassword"* ]]; then
-        fail "No valid atuin sync key — sign into 1Password (Phase 5) and re-run: bash bootv4.sh --from-phase 9"
-        mark_done "phase_9"
-        return 0
+        fail "No valid atuin sync key after hard reset + chezmoi apply"
+        return 1
     fi
 
     info "Atuin sync key found in config"
@@ -585,13 +678,12 @@ phase_9() {
     tty_read -r atuin_user
 
     info "Logging into atuin (will prompt for password)..."
-    atuin login -u "$atuin_user" -k "$atuin_key" </dev/tty
+    atuin account login -u "$atuin_user" -k "$atuin_key" </dev/tty
     local login_rc=$?
 
     if [[ $login_rc -ne 0 ]]; then
-        warn "Atuin login failed (exit $login_rc)"
-        mark_done "phase_9"
-        return 0
+        fail "Atuin login failed (exit $login_rc)"
+        return 1
     fi
 
     info "Running force sync..."
@@ -601,11 +693,11 @@ phase_9() {
         success "Atuin synced"
         track "Shell" "atuin sync" "pass"
     else
-        warn "Atuin sync may have issues"
+        fail "Atuin sync is still not healthy"
         track "Shell" "atuin sync" "fail"
+        return 1
     fi
 
-    mark_done "phase_9"
 }
 
 # ============================================================================
@@ -628,8 +720,11 @@ phase_10() {
         "carapace:carapace"
         "chezmoi:chezmoi"
         "fish:fish"
+        "nu:nu"
         "nvim:nvim"
         "tmux:tmux"
+        "tv:tv"
+        "rustup:rustup"
         "git:git"
     )
 
@@ -650,14 +745,18 @@ phase_10() {
         "$HOME/.config/atuin/config.toml"
         "$HOME/.config/starship.toml"
         "$HOME/.config/nushell/config.nu"
+        "$HOME/.config/nushell/env.nu"
+        "$HOME/Library/Application Support/nushell/config.nu"
+        "$HOME/Library/Application Support/nushell/env.nu"
+        "$HOME/.config/ghostty/config"
         "$HOME/.gitconfig"
     )
 
     for cfg in "${config_checks[@]}"; do
         if [[ -f "$cfg" ]]; then
-            track "Final Configs" "$(basename "$cfg")" "pass"
+            track "Final Configs" "$cfg" "pass"
         else
-            track "Final Configs" "$(basename "$cfg")" "fail"
+            track "Final Configs" "$cfg" "fail"
         fi
     done
 
@@ -725,17 +824,19 @@ echo "  Starting from phase: $START_PHASE"
 echo "============================================"
 echo ""
 
-should_run 0  && { phase_done "phase_0"  || phase_0;  }
-should_run 1  && { phase_done "phase_1"  || phase_1;  }
-should_run 2  && { phase_done "phase_2"  || phase_2;  }
-should_run 3  && { phase_done "phase_3"  || phase_3;  }
-should_run 4  && { phase_done "phase_4"  || phase_4;  }
-should_run 5  && { phase_done "phase_5"  || phase_5;  }
-should_run 6  && { phase_done "phase_6"  || phase_6;  }
-should_run 7  && { phase_done "phase_7"  || phase_7;  }
-should_run 8  && { phase_done "phase_8"  || phase_8;  }
-should_run 9  && { phase_done "phase_9"  || phase_9;  }
-should_run 10 && phase_10
+cleanup_legacy_state
+
+run_phase 0 phase_0 || return 1
+run_phase 1 phase_1 || return 1
+run_phase 2 phase_2 || return 1
+run_phase 3 phase_3 || return 1
+run_phase 4 phase_4 || return 1
+run_phase 5 phase_5 || return 1
+run_phase 6 phase_6 || return 1
+run_phase 7 phase_7 || return 1
+run_phase 8 phase_8 || return 1
+run_phase 9 phase_9 || return 1
+run_phase 10 phase_10 || return 1
 
 }  # end bootv4_main
 

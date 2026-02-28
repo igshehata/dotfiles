@@ -25,13 +25,31 @@ $env.PATH = ($env.PATH | split row (char esep) | prepend '/run/current-system/sw
 $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join '.local' 'bin'))
 
 # Initialize fnm (Fast Node Manager)
-fnm env --json | from json | load-env
-$env.PATH = ($env.PATH | split row (char esep) | prepend $"($env.FNM_MULTISHELL_PATH)/bin")
+if ((which fnm | length) > 0) {
+  fnm env --json | from json | load-env
+  $env.PATH = ($env.PATH | split row (char esep) | prepend $"($env.FNM_MULTISHELL_PATH)/bin")
+}
 
-mkdir ($nu.data-dir | path join "vendor/autoload")
-starship init nu | save -f ($nu.data-dir | path join "vendor/autoload/starship.nu")
-source ~/.zoxide.nu
-source ~/.cache/carapace/init.nu
+# Keep generated init scripts in Nu vendor autoload so they are loaded automatically.
+let nu_vendor_autoload = ($nu.data-dir | path join "vendor/autoload")
+mkdir $nu_vendor_autoload
+
+if ((which starship | length) > 0) {
+  starship init nu | save -f ($nu_vendor_autoload | path join "starship.nu")
+}
+
+if ((which atuin | length) > 0) {
+  atuin init nu | save -f ($nu_vendor_autoload | path join "atuin.nu")
+}
+
+if ((which carapace | length) > 0) {
+  carapace _carapace nushell | save -f ($nu_vendor_autoload | path join "carapace.nu")
+}
+
+if ((which zoxide | length) > 0) {
+  zoxide init nushell | save -f ($nu_vendor_autoload | path join "zoxide.nu")
+}
+
 # ============================================================================
 # Rustup/Cargo - Add Rust toolchain to PATH
 # ============================================================================
@@ -41,4 +59,3 @@ $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join 
 # Bun - Add Bun runtime to PATH
 # ============================================================================
 $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join '.bun' 'bin'))
-zoxide init nushell | save -f ~/.zoxide.nu
