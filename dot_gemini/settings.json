@@ -1,0 +1,32 @@
+{
+  "ide": {
+    "hasSeenNudge": true,
+    "enabled": true
+  },
+  "ui": {
+    "showMemoryUsage": true,
+    "showLineNumbers": false,
+    "theme": "Default"
+  },
+  "mcpServers": {},
+  "context": {
+    "includeDirectories": [
+      "/Users/islam.shehata/vois/vc-one-app-web",
+      "/Users/islam.shehata/vois/OneDS/",
+      "/Users/islam.shehata/vois/cep-cicd-framework/",
+      "/Users/islam.shehata/Documents/Obsidian Vault/"
+    ]
+  },
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "tools": {
+    "useRipgrep": true
+  },
+  "general": {
+    "vimMode": true,
+    "previewFeatures": true
+  }
+}

@@ -21,6 +21,9 @@ $env.EDITOR = 'nvim'
 # Nix darwin system binaries
 $env.PATH = ($env.PATH | split row (char esep) | prepend '/run/current-system/sw/bin')
 
+# Claude Code (native installer)
+$env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join '.local' 'bin'))
+
 # Initialize fnm (Fast Node Manager)
 fnm env --json | from json | load-env
 $env.PATH = ($env.PATH | split row (char esep) | prepend $"($env.FNM_MULTISHELL_PATH)/bin")

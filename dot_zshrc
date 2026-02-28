@@ -14,7 +14,7 @@ PATH=~/.console-ninja/.bin:$PATH
 
 
 # bun completions
-[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
+[ -s "/Users/islam.shehata/.bun/_bun" ] && source "/Users/islam.shehata/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
@@ -31,7 +31,7 @@ export ZSH="$HOME/.oh-my-zsh"
 # to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 ZSH_THEME="powerlevel10k/powerlevel10k"
-EZA_CONFIG_DIR="$HOME/.config/eza"
+EZA_CONFIG_DIR="/Users/islam.shehata/.config/eza"
 # Set list of themes to pick from when loading at random
 # Setting this variable when ZSH_THEME=random will cause zsh to load
 # a theme from this variable instead of looking in $ZSH/themes/
@@ -150,25 +150,27 @@ eval "$(github-copilot-cli alias -- "$0")"
 
 
 # Added by Windsurf
-export PATH="$HOME/.codeium/windsurf/bin:$PATH"
+export PATH="/Users/islam.shehata/.codeium/windsurf/bin:$PATH"
 
 eval "$(zoxide init zsh)"
 
 # The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=($HOME/.docker/completions $fpath)
+fpath=(/Users/islam.shehata/.docker/completions $fpath)
 # autoload -Uz compinit
 # compinit
 # End of Docker CLI completions
 
 # fnm
-FNM_PATH="$HOME/Library/Application Support/fnm"
+FNM_PATH="/Users/islam.shehata/Library/Application Support/fnm"
 if [ -d "$FNM_PATH" ]; then
-  export PATH="$HOME/Library/Application Support/fnm:$PATH"
+  export PATH="/Users/islam.shehata/Library/Application Support/fnm:$PATH"
   eval "`fnm env`"
 fi
 
 # Initialize atuin (history sync)
 eval "$(atuin init zsh)"
 
+# Claude Code (native installer) + uv
+export PATH="$HOME/.local/bin:$PATH"
 . "$HOME/.local/bin/env"
 eval "$(mise activate zsh)"

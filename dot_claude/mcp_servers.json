@@ -1,0 +1,34 @@
+{
+ "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": "10000"
+      },
+      "fromGalleryId": "upstash.context7"
+    },
+    "Sequential Thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "env": {},
+      "fromGalleryId": "modelcontextprotocol.servers_sequentialthinking"
+    },
+    "Git": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-git",
+        "--repository",
+        "/Users/islam.shehata/vois/vc-one-app-web"
+      ],
+      "env": {},
+      "fromGalleryId": "modelcontextprotocol.servers_git"
+    }
+  }
+ }

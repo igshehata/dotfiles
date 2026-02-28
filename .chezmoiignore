@@ -18,6 +18,45 @@ nix-config/
 .kube/                         # Cluster configs
 .config/chezmoi/               # Machine-specific data
 
+# AI agents — auth, caches, session data (NOT synced)
+.claude/history.jsonl
+.claude/stats-cache.json
+.claude/backups/
+.claude/cache/
+.claude/debug/
+.claude/file-history/
+.claude/ide/
+.claude/paste-cache/
+.claude/plans/
+.claude/projects/
+.claude/session-env/
+.claude/shell-snapshots/
+.claude/plugins/
+.gemini/oauth_creds.json
+.gemini/google_account_id
+.gemini/google_accounts.json
+.gemini/installation_id
+.gemini/state.json
+.gemini/settings.json.orig
+.gemini/antigravity-browser-profile/
+.gemini/antigravity/annotations/
+.gemini/antigravity/brain/
+.gemini/antigravity/browser_recordings/
+.gemini/antigravity/code_tracker/
+.gemini/antigravity/context_state/
+.gemini/antigravity/conversations/
+.gemini/antigravity/html_artifacts/
+.gemini/antigravity/implicit/
+.gemini/antigravity/installation_id
+.gemini/antigravity/knowledge/
+.gemini/antigravity/playground/
+.gemini/antigravity/scratch/
+.gemini/extensions/
+.gemini/tmp/
+.config/opencode/node_modules/
+.config/opencode/bun.lock
+.config/opencode/.gitignore
+
 # Caches and history
 .zsh_history
 .bash_history
