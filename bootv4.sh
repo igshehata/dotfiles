@@ -63,6 +63,15 @@ should_run() {
     [[ "$phase_num" -ge "$START_PHASE" ]]
 }
 
+# When --from-phase is used, clear state for those phases so they actually re-run
+if [[ "$START_PHASE" -gt 0 ]]; then
+    if [[ -f "$STATE_FILE" ]]; then
+        for i in $(seq "$START_PHASE" 10); do
+            sed -i '' "/^phase_${i}$/d" "$STATE_FILE" 2>/dev/null || true
+        done
+    fi
+fi
+
 # ============================================================================
 # Phase 0: Prerequisites (Xcode CLT)
 # ============================================================================
