@@ -1,11 +1,8 @@
 { pkgs, ... }:
 
 {
-  # Nix packages (CLI tools)
+  # Nix packages (escape hatch; Homebrew brews are the canonical CLI inventory)
   environment.systemPackages = with pkgs; [
-    llmfit
-    zig        neofetch    pandoc    trivy    yazi    ripgrep    bat    git
-    neovim
   ];
 
   # Homebrew integration
@@ -43,22 +40,34 @@
       "gh"
       "gnupg"
       "go"
+      "git"
       "jq"
       "k6"
       "kind"
+      "llmfit"
       "lua"
       "luajit"
+      "neovim"
+      "pandoc"
       "node"
       "nushell"
       "openjdk"
       "pinentry"
       "pnpm"
       "python@3.13"
+      "ripgrep"
+      "rustup"
       "starship"
+      "television"
       "tmux"
       "tree"
+      "trivy"
+      "uv"
+      "yazi"
+      "zig"
       "zoxide"
       "opencode"
+      "bat"
     ];
 
     # GUI apps

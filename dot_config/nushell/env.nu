@@ -18,6 +18,14 @@
 # them for future reference.
 $env.EDITOR = 'nvim'
 
+# Homebrew environment
+if ('/opt/homebrew/bin/brew' | path exists) {
+  $env.HOMEBREW_PREFIX = '/opt/homebrew'
+  $env.HOMEBREW_CELLAR = '/opt/homebrew/Cellar'
+  $env.HOMEBREW_REPOSITORY = '/opt/homebrew'
+  $env.PATH = ($env.PATH | split row (char esep) | prepend '/opt/homebrew/sbin' | prepend '/opt/homebrew/bin')
+}
+
 # Nix darwin system binaries
 $env.PATH = ($env.PATH | split row (char esep) | prepend '/run/current-system/sw/bin')
 
@@ -58,4 +66,5 @@ $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join 
 # ============================================================================
 # Bun - Add Bun runtime to PATH
 # ============================================================================
-$env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join '.bun' 'bin'))
+$env.BUN_INSTALL = ($env.HOME | path join '.bun')
+$env.PATH = ($env.PATH | split row (char esep) | prepend ($env.BUN_INSTALL | path join 'bin'))

@@ -74,10 +74,11 @@ add-hook hooks.pre_prompt $mise_hook
 add-hook hooks.env_change.PWD $mise_hook
 
 # Transient prompt configuration
-$env.TRANSIENT_PROMPT_COMMAND = {|| starship module character }
-$env.TRANSIENT_PROMPT_COMMAND_RIGHT = {|| starship module time }
+$env.TRANSIENT_PROMPT_COMMAND = {|| if ((which starship | length) > 0) { starship module character } else { '' } }
+$env.TRANSIENT_PROMPT_COMMAND_RIGHT = {|| if ((which starship | length) > 0) { starship module time } else { '' } }
 
 # Atuin is initialized from Nu vendor autoload scripts generated in env.nu
+source ($nu.default-config-dir | path join "zoxide.nu")
 
 # ============================================================================
 # Git Aliases (from nu_scripts)
@@ -96,7 +97,11 @@ $env.config.completions.external.completer = {|spans|
         }
     } else {
         # Fall back to carapace for everything else
-        carapace $spans.0 nushell ...$spans | from json
+        if ((which carapace | length) > 0) {
+            carapace $spans.0 nushell ...$spans | from json
+        } else {
+            null
+        }
     }
 }
 

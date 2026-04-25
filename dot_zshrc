@@ -1,8 +1,10 @@
-# OpenCode env parity with fish (PATH/exports for tool runs).
-# Safe for interactive shells; also sourced from ~/.zshenv for non-interactive.
-if [[ -f "$HOME/.config/opencode/zsh/env.zsh" ]]; then
-  source "$HOME/.config/opencode/zsh/env.zsh"
+if [[ -x /opt/homebrew/bin/brew ]]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
+
+export PATH="/run/current-system/sw/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$PATH"
 
 # bun completions
 if [[ -s "$HOME/.bun/_bun" ]]; then
@@ -15,23 +17,24 @@ export PATH="$BUN_INSTALL/bin:$PATH"
 
 # aliases
 alias ci="code-insiders"
-alias ls="eza --icons=always"
-alias lsa="eza -la --no-permissions --icons=always"
-alias lt="eza -T"
-alias llt="eza -lT --no-permissions --icons=always"
+alias ls="eza -l --no-permissions --icons --git"
+alias ll="eza -la --no-permissions --icons --git"
+alias la="eza -a --icons --git"
+alias lt="eza -T --no-permissions --icons --level=2 --git"
+alias llt="eza -lT --no-permissions --icons --level=2 --git"
+alias nv="nvim"
+alias py="python3"
+alias pip="pip3"
+alias drs='sudo darwin-rebuild switch --flake ~/nix-config#{{ .chezmoi.hostname }}'
 alias purge="git fetch -p"
 alias bathelp='bat --plain --language=help'
 help() {
     "$@" --help 2>&1 | bathelp
 }
 
-if command -v zoxide >/dev/null 2>&1; then
-  eval "$(zoxide init zsh)"
-fi
-
 # fnm
 FNM_PATH="$HOME/Library/Application Support/fnm"
-if [[ -d "$FNM_PATH" ]]; then
+if command -v fnm >/dev/null 2>&1 && [[ -d "$FNM_PATH" ]]; then
   export PATH="$FNM_PATH:$PATH"
   eval "$(fnm env)"
 fi
@@ -41,9 +44,20 @@ if command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init zsh)"
 fi
 
-# Claude Code (native installer) + uv
-export PATH="$HOME/.local/bin:$PATH"
-. "$HOME/.local/bin/env"
-eval "$(mise activate zsh)"
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh)"
+fi
+
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init zsh)"
+fi
+
+if command -v carapace >/dev/null 2>&1; then
+  source <(carapace _carapace zsh)
+fi
 
 if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi
+
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi

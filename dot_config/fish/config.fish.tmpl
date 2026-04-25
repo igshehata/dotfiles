@@ -1,7 +1,19 @@
-/opt/homebrew/bin/brew shellenv | source
+if test -x /opt/homebrew/bin/brew
+    /opt/homebrew/bin/brew shellenv | source
+end
 
 # Nix darwin system binaries
 fish_add_path /run/current-system/sw/bin
+
+# Local/native installer binaries
+fish_add_path $HOME/.local/bin
+
+# Rust/Cargo toolchain binaries
+fish_add_path $HOME/.cargo/bin
+
+# Bun runtime
+set -gx BUN_INSTALL "$HOME/.bun"
+fish_add_path $BUN_INSTALL/bin
 
 if status is-interactive
     # Enable vim mode
@@ -12,16 +24,23 @@ if status is-interactive
     # Command+Backspace: delete to start of line (works in vi insert mode)
     bind -M insert \cU backward-kill-line
 
-    fnm env --use-on-cd | source
+    if command -q fnm
+        fnm env --use-on-cd | source
+    end
 
-    # add to ~/.config/fish/config.fish
-    export BUN_INSTALL="$HOME/.bun"
-    export PATH="$BUN_INSTALL/bin:$PATH"
+    if command -q mise
+        mise activate fish | source
+    end
+
     # Initialize starship prompt
-    starship init fish | source
+    if command -q starship
+        starship init fish | source
+    end
 
     # Initialize atuin (history sync)
-    atuin init fish | source
+    if command -q atuin
+        atuin init fish | source
+    end
 
     # Configure transient prompt - shows only character module
     function starship_transient_prompt_func
@@ -34,14 +53,20 @@ if status is-interactive
     end
 
     # Enable transient prompt mode
-    enable_transience
+    if functions -q enable_transience
+        enable_transience
+    end
 
     # Initialize zoxide
-    zoxide init fish | source
+    if command -q zoxide
+        zoxide init fish | source
+    end
     # Set up fzf key bindings (disabled - using television for ctrl+t instead)
     # fzf --fish | source
     # Initialize carapace completions
-    carapace _carapace | source
+    if command -q carapace
+        carapace _carapace | source
+    end
 
     # Git push: Tab inserts "origin <current-branch>" directly (no escaped space)
     function _git_push_tab_complete
