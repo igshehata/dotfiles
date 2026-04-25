@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+if command -v nu &>/dev/null; then
+    nu_default_dir="$(nu -c 'print $nu.default-config-dir' 2>/dev/null || true)"
+    if [[ -n "$nu_default_dir" ]]; then
+        mkdir -p "$nu_default_dir"
+        for nu_file in config.nu env.nu; do
+            src="$HOME/.config/nushell/$nu_file"
+            dst="$nu_default_dir/$nu_file"
+            if [[ "$src" == "$dst" ]]; then
+                continue
+            fi
+            if [[ -f "$src" ]]; then
+                ln -sfn "$src" "$dst"
+            fi
+        done
+    fi
+fi
+
+ghostty_legacy="$HOME/Library/Application Support/com.mitchellh.ghostty/config"
+if [[ -f "$ghostty_legacy" ]]; then
+    ghostty_backup="${ghostty_legacy}.chezmoi.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$ghostty_legacy" "$ghostty_backup"
+fi
+
+if command -v fish &>/dev/null && [[ ! -f "$HOME/.config/fish/functions/fisher.fish" ]]; then
+    fish --no-config -c 'curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher' >/dev/null 2>&1 || true
+fi
+
+tpm_dir="$HOME/.config/tmux/plugins/tpm"
+if [[ ! -d "$tpm_dir" ]]; then
+    git clone https://github.com/tmux-plugins/tpm "$tpm_dir" >/dev/null 2>&1 || true
+fi

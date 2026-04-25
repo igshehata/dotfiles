@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# nu-config-sha256: {{ include "dot_config/nushell/config.nu.tmpl" | sha256sum }}
+# nu-env-sha256: {{ include "dot_config/nushell/env.nu" | sha256sum }}
+# tmux-conf-sha256: {{ include "dot_config/tmux/tmux.conf" | sha256sum }}
+
+set -uo pipefail
+
+if command -v nu &>/dev/null; then
+    nu_data_dir="$(nu -c 'print $nu.data-dir' 2>/dev/null || true)"
+    if [[ -n "$nu_data_dir" ]]; then
+        nu_vendor_dir="$nu_data_dir/vendor/autoload"
+        mkdir -p "$nu_vendor_dir"
+
+        command -v starship &>/dev/null && starship init nu > "$nu_vendor_dir/starship.nu"
+        command -v atuin &>/dev/null && atuin init nu > "$nu_vendor_dir/atuin.nu"
+        command -v carapace &>/dev/null && carapace _carapace nushell > "$nu_vendor_dir/carapace.nu"
+        command -v zoxide &>/dev/null && zoxide init nushell > "$nu_vendor_dir/zoxide.nu"
+    fi
+fi
+
+tpm_dir="$HOME/.config/tmux/plugins/tpm"
+if [[ -x "$tpm_dir/bin/install_plugins" ]]; then
+    "$tpm_dir/bin/install_plugins" >/dev/null 2>&1 || true
+fi

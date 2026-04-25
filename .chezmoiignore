@@ -1,0 +1,69 @@
+**/.git
+bootv4.sh
+
+# Tool-managed authentication (don't sync these)
+.config/gh/                    # GitHub CLI manages tokens
+.config/op/                    # 1Password CLI device auth
+.config/github-copilot/        # Copilot auth tokens
+.docker/config.json            # Docker credential helper
+
+# Large or non-portable app state
+.config/raycast/               # Raycast state stays private; restore from private export
+Library/Application Support/com.raycast.macos/
+
+# Plugin managers handle these
+.config/tmux/plugins/          # TPM manages tmux plugins
+
+# Machine-specific
+.kube/                         # Cluster configs
+.config/chezmoi/               # Machine-specific data
+
+# AI agents — auth, caches, session data (NOT synced)
+.claude/history.jsonl
+.claude/stats-cache.json
+.claude/backups/
+.claude/cache/
+.claude/debug/
+.claude/file-history/
+.claude/ide/
+.claude/paste-cache/
+.claude/plans/
+.claude/projects/
+.claude/session-env/
+.claude/shell-snapshots/
+.claude/plugins/
+.config/opencode/node_modules/
+.config/opencode/bun.lock
+.config/opencode/.gitignore
+
+# Caches and history
+.zsh_history
+.bash_history
+.zcompdump*
+.lesshst
+.viminfo
+.config/nushell/history.txt
+.config/fish/fish_history
+
+# Backup files
+**/*.bak
+**/*.backup
+**/*.backup.*
+**/*.old
+**/.backup
+
+# Upstream repo artifacts (prevent cloned repos from bloating dotfiles)
+**/imgs/
+**/.github/
+
+# Documentation (not needed in dotfiles)
+.config/nvim/LICENSE
+.config/nvim/README.md
+**/README.md
+**/LICENSE
+
+# Compiled/cache files
+**/.DS_Store
+**/__pycache__/
+**/*.pyc
+.config/fish/completions/*.zwc

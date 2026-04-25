@@ -1,0 +1,49 @@
+# OpenCode env parity with fish (PATH/exports for tool runs).
+# Safe for interactive shells; also sourced from ~/.zshenv for non-interactive.
+if [[ -f "$HOME/.config/opencode/zsh/env.zsh" ]]; then
+  source "$HOME/.config/opencode/zsh/env.zsh"
+fi
+
+# bun completions
+if [[ -s "$HOME/.bun/_bun" ]]; then
+  source "$HOME/.bun/_bun"
+fi
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# aliases
+alias ci="code-insiders"
+alias ls="eza --icons=always"
+alias lsa="eza -la --no-permissions --icons=always"
+alias lt="eza -T"
+alias llt="eza -lT --no-permissions --icons=always"
+alias purge="git fetch -p"
+alias bathelp='bat --plain --language=help'
+help() {
+    "$@" --help 2>&1 | bathelp
+}
+
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi
+
+# fnm
+FNM_PATH="$HOME/Library/Application Support/fnm"
+if [[ -d "$FNM_PATH" ]]; then
+  export PATH="$FNM_PATH:$PATH"
+  eval "$(fnm env)"
+fi
+
+# Initialize atuin (history sync)
+if command -v atuin >/dev/null 2>&1; then
+  eval "$(atuin init zsh)"
+fi
+
+# Claude Code (native installer) + uv
+export PATH="$HOME/.local/bin:$PATH"
+. "$HOME/.local/bin/env"
+eval "$(mise activate zsh)"
+
+if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi
