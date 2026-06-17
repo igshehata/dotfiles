@@ -1,6 +1,18 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@plannotator/opencode@latest"],
+  "lsp": true,
+  "plugin": [
+    [
+      "@plannotator/opencode@latest",
+      {
+        "workflow": "plan-agent",
+        "planningAgents": ["plan"],
+      },
+    ],
+    "@mohak34/opencode-notifier@latest",
+    "opencode-mermaid-renderer@0.0.1",
+    "@datadog/opencode-plugin",
+  ],
   "permission": {
     "bash": {
       "*": "ask",

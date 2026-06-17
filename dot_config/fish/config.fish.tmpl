@@ -211,3 +211,32 @@ function nix
             command nix $argv
     end
 end
+
+# chezmoi workflow helpers
+function cz --description "chezmoi shortcuts"
+    switch $argv[1]
+        case edit e
+            # Open source file in editor, auto-applies on save
+            chezmoi edit $argv[2..-1]
+        case sync s
+            # After a tool/agent modifies local files, sync back to source
+            set -l changes (chezmoi status 2>&1 | string collect)
+            if test -z "$changes"
+                echo "✓ Everything in sync."
+                return 0
+            end
+            echo "Local files differ from chezmoi source:"
+            echo ""
+            chezmoi diff 2>&1
+            echo ""
+            read -P "Re-add these changes to chezmoi source? [y/N] " confirm
+            if test "$confirm" = y -o "$confirm" = Y
+                chezmoi re-add
+                echo "✓ Synced to chezmoi source."
+            end
+        case diff d
+            chezmoi diff $argv[2..-1]
+        case '*'
+            command chezmoi $argv
+    end
+end

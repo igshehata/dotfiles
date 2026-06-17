@@ -2,6 +2,11 @@
 {{- $git_work_email := promptStringOnce . "git_work_email" "Work email (current employer)" -}}
 {{- $git_personal_email := promptStringOnce . "git_personal_email" "Personal email" -}}
 
+[edit]
+    command = "code-insiders"
+    args = ["--wait"]
+    apply = true
+
 [data]
     git_name = {{ $git_name | quote }}
     git_work_email = {{ $git_work_email | quote }}

@@ -1,5 +1,6 @@
 **/.git
 bootv4.sh
+AGENTS.md
 
 # Tool-managed authentication (don't sync these)
 .config/gh/                    # GitHub CLI manages tokens
