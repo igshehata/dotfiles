@@ -6,7 +6,9 @@
       "@plannotator/opencode@latest",
       {
         "workflow": "plan-agent",
-        "planningAgents": ["plan"],
+        "planningAgents": [
+          "plan"
+        ],
       },
     ],
     "@mohak34/opencode-notifier@latest",
@@ -93,7 +95,11 @@
     },
     "next-devtools": {
       "type": "local",
-      "command": ["npx", "-y", "next-devtools-mcp@latest"],
+      "command": [
+        "npx",
+        "-y",
+        "next-devtools-mcp@latest"
+      ],
       "enabled": true,
     },
     "sequential-thinking": {
@@ -105,10 +111,10 @@
       ],
       "enabled": true,
     },
-    "figma": {
-      "type": "remote",
-      "url": "https://mcp.figma.com/mcp",
+    "figma-desktop": {
+      "type": "local",
       "enabled": true,
-    },
+      "url": "http://127.0.0.1:3845/mcp"
+    }
   },
 }
