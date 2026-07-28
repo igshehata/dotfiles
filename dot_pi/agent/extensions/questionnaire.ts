@@ -31,7 +31,6 @@ interface Question {
 	label: string;
 	prompt: string;
 	options: QuestionOption[];
-	allowOther: boolean;
 }
 
 interface Answer {
@@ -63,8 +62,9 @@ const QuestionSchema = Type.Object({
 		}),
 	),
 	prompt: Type.String({ description: "The full question text to display" }),
-	options: Type.Array(QuestionOptionSchema, { description: "Available options to choose from" }),
-	allowOther: Type.Optional(Type.Boolean({ description: "Allow 'Type something' option (default: true)" })),
+	options: Type.Array(QuestionOptionSchema, {
+		description: "Available options to choose from; a free-text response option is always added automatically",
+	}),
 });
 
 const QuestionnaireParams = Type.Object({
@@ -86,7 +86,7 @@ export default function questionnaire(pi: ExtensionAPI) {
 		name: "questionnaire",
 		label: "Questionnaire",
 		description:
-			"Ask the user one or more questions. Use for clarifying requirements, getting preferences, or confirming decisions. For single questions, shows a simple option list. For multiple questions, shows a tab-based interface.",
+			"Ask the user one or more questions. Every question includes a free-text option so the user can reply directly in their own words. For single questions, shows a simple options list. For multiple questions, shows a tab-based interface.",
 		parameters: QuestionnaireParams,
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -97,11 +97,12 @@ export default function questionnaire(pi: ExtensionAPI) {
 				return errorResult("Error: No questions provided");
 			}
 
-			// Normalize questions with defaults
+			// Normalize labels while keeping the public question shape strict.
 			const questions: Question[] = params.questions.map((q, i) => ({
-				...q,
+				id: q.id,
 				label: q.label || `Q${i + 1}`,
-				allowOther: q.allowOther !== false,
+				prompt: q.prompt,
+				options: q.options,
 			}));
 
 			const isMulti = questions.length > 1;
@@ -116,7 +117,7 @@ export default function questionnaire(pi: ExtensionAPI) {
 				let cachedLines: string[] | undefined;
 				const answers = new Map<string, Answer>();
 
-				// Editor for "Type something" option
+				// Editor for the always-available custom response option
 				const editorTheme: EditorTheme = {
 					borderColor: (s) => theme.fg("accent", s),
 					selectList: {
@@ -146,11 +147,15 @@ export default function questionnaire(pi: ExtensionAPI) {
 				function currentOptions(): RenderOption[] {
 					const q = currentQuestion();
 					if (!q) return [];
-					const opts: RenderOption[] = [...q.options];
-					if (q.allowOther) {
-						opts.push({ value: "__other__", label: "Type something.", isOther: true });
-					}
-					return opts;
+					return [
+						...q.options,
+						{
+							value: "__other__",
+							label: "Write a custom response…",
+							description: "Reply directly in your own words",
+							isOther: true,
+						},
+					];
 				}
 
 				function allAnswered(): boolean {
