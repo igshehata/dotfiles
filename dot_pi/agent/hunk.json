@@ -1,0 +1,8 @@
+{
+  "bindings": {
+    "toggle": "ctrl+shift+h"
+  },
+  "overlay": {
+    "layout": "full"
+  }
+}

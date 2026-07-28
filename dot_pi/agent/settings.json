@@ -1,0 +1,22 @@
+{
+  "lastChangelogVersion": "0.82.0",
+  "theme": "tokyo-night-storm",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-sol",
+  "defaultThinkingLevel": "max",
+  "hideThinkingBlock": false,
+  "showHardwareCursor": true,
+  "editorPaddingX": 1,
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "packages": [
+    "npm:@hypabolic/pi-hypa",
+    "npm:pi-web-access",
+    "npm:pi-mcp-adapter",
+    "npm:@ff-labs/pi-fff",
+    "npm:@firstpick/pi-themes-bundle",
+    "npm:pi-xai-oauth",
+    "npm:pi-hunk"
+  ]
+}

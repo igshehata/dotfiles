@@ -10,6 +10,7 @@ AGENTS.md
 
 # Large or non-portable app state
 .config/raycast/               # Raycast state stays private; restore from private export
+.config/zed/prompts/
 Library/Application Support/com.raycast.macos/
 
 # Plugin managers handle these
@@ -20,6 +21,20 @@ Library/Application Support/com.raycast.macos/
 .config/chezmoi/               # Machine-specific data
 
 # AI agents — auth, caches, session data (NOT synced)
+.agents/.skill-lock.json
+.agents/skills/
+.pi/agent/auth.json
+.pi/agent/bin/
+.pi/agent/cache/
+.pi/agent/git/
+.pi/agent/models-store.json
+.pi/agent/npm/
+.pi/agent/*.log
+.pi/agent/run-history.jsonl
+.pi/agent/sessions/
+.pi/agent/trust.json
+.pi/agent/extensions/herdr-agent-state.ts
+.pi/context-mode/
 .claude/history.jsonl
 .claude/stats-cache.json
 .claude/backups/
