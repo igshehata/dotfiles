@@ -21,8 +21,6 @@ Library/Application Support/com.raycast.macos/
 .config/chezmoi/               # Machine-specific data
 
 # AI agents — auth, caches, session data (NOT synced)
-.agents/.skill-lock.json
-.agents/skills/
 .pi/agent/auth.json
 .pi/agent/bin/
 .pi/agent/cache/
