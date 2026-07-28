@@ -3,4 +3,3 @@
 .config/fish/functions/lt.fish
 .config/nushell/vendor/autoload/wt.nu
 .config/nushell/zoxide.nu
-.config/opencode/package-lock.json

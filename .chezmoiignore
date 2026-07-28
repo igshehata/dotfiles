@@ -35,6 +35,7 @@ Library/Application Support/com.raycast.macos/
 .claude/plugins/
 .config/opencode/node_modules/
 .config/opencode/bun.lock
+.config/opencode/package-lock.json
 .config/opencode/.gitignore
 .config/opencode/opencode-notifier-state.json
 .config/opencode/plugins/herdr-agent-state.js
