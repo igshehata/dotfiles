@@ -272,17 +272,14 @@ phase_4() {
     # (some tools are intentionally installed via Nix and won't appear in brew list)
     info "Verifying CLI tools are available..."
     local formula_checks=(
-        "mise:mise" "direnv:direnv" "aichat:aichat" "atuin:atuin" "bash:bash"
-        "biome:biome" "carapace:carapace" "chezmoi:chezmoi" "commitizen:cz"
-        "difftastic:difft" "eza:eza" "fd:fd" "ffmpeg:ffmpeg" "fish:fish"
-        "fnm:fnm" "fzf:fzf" "gh:gh" "gnupg:gpg"
-        "go:go" "jq:jq" "k6:k6" "kind:kind" "lua:lua" "luajit:luajit"
-        "node:node" "nushell:nu" "openjdk:java" "pinentry:pinentry"
-        "pnpm:pnpm" "starship:starship" "tmux:tmux" "tree:tree"
-        "zoxide:zoxide" "opencode:opencode" "zig:zig" "neofetch:neofetch"
-        "pandoc:pandoc" "trivy:trivy" "yazi:yazi" "ripgrep:rg" "bat:bat"
-        "neovim:nvim" "television:tv" "rustup:rustup" "bun:bun"
-        "python@3.13:python3.13"
+        "agent-browser:agent-browser" "aichat:aichat"
+        "anomalyco/tap/opencode:opencode" "atuin:atuin" "bat:bat"
+        "carapace:carapace" "chezmoi:chezmoi" "eza:eza" "fd:fd"
+        "fish:fish" "fnm:fnm" "fzf:fzf" "gh:gh" "glow:glow"
+        "herdr:herdr" "hunk:hunk" "jj:jj" "jq:jq" "llmfit:llmfit"
+        "mise:mise" "neovim:nvim" "nushell:nu" "ripgrep:rg"
+        "starship:starship" "television:tv" "tmux:tmux"
+        "worktrunk:wt" "zoxide:zoxide"
     )
 
     for check in "${formula_checks[@]}"; do
@@ -298,9 +295,9 @@ phase_4() {
     done
 
     local casks=(
-        superwhisper 1password 1password-cli antigravity apidog arc
-        discord ghostty google-chrome obsidian postman raycast
-        visual-studio-code@insiders wezterm font-jetbrains-mono-nerd-font
+        1password 1password-cli aerospace arc codex discord ghostty
+        google-chrome obsidian raycast superwhisper
+        font-jetbrains-mono-nerd-font
     )
 
     for cask in "${casks[@]}"; do
