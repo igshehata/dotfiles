@@ -36,6 +36,20 @@ Library/Application Support/com.raycast.macos/
 .config/opencode/node_modules/
 .config/opencode/bun.lock
 .config/opencode/.gitignore
+.config/opencode/opencode-notifier-state.json
+.config/opencode/plugins/herdr-agent-state.js
+
+# Tool-generated configuration and local state
+.config/fish/fish_variables
+.config/fish/conf.d/fish_frozen_*.fish
+.config/fish/completions/wt.fish
+.config/fish/functions/wt.fish
+.config/herdr/.plugins.lock
+.config/herdr/*.log
+.config/herdr/release-notes.json
+.config/herdr/session*.json
+.config/hunk/state.json
+.config/worktrunk/approvals.toml*
 
 # Caches and history
 .zsh_history

@@ -6,31 +6,30 @@ This is a **chezmoi** source directory. All edits to dotfiles MUST happen here �
 
 **Edit source files in THIS repo. Run `chezmoi apply` to push changes to the live system.**
 
-Never run `chezmoi re-add`. Never edit files under `~/` directly. The flow is always: source → apply → destination.
+Never run an **unscoped** `chezmoi re-add`. A scoped `chezmoi re-add <target>` is allowed only after reviewing and intentionally accepting target drift; templates must be merged or edited in source instead. Never edit files under `~/` directly. The flow is always: source → apply → destination.
 
 ## Session Start — Consolidation Protocol
 
 **Before making any edits, ALWAYS run these steps first:**
 
 ```bash
-chezmoi re-add          # capture any local drift (tools/agents that edited live files)
-git pull --rebase       # bring in changes from other machines
+git status              # inspect existing source changes
+git pull --rebase --autostash  # bring in changes from other machines safely
+chezmoi status          # identify source changes vs target drift
+chezmoi diff            # review what apply would change
 ```
 
-If `chezmoi re-add` produces changes, stage and review them before proceeding:
-```bash
-git status              # see what re-add brought in
-git diff --cached       # if staged, or git diff for unstaged
-```
+If target files have drifted, review each file before continuing. Never bulk-import drift. Use `chezmoi merge <target>` for templates or conflicts, and use `chezmoi re-add <target>` only for specific non-template files whose target changes are intentional.
 
-If `git pull` produces conflicts, resolve them with the user before continuing.
+If `git pull` produces conflicts, resolve them with the user before continuing. If secret-backed templates prevent a global status/diff, inspect the affected targets with scoped commands.
 
 Only after consolidation is complete should you proceed with the user's requested edits.
 
 ## After Editing
 
 ```bash
-chezmoi apply --force   # push source → live system
+chezmoi diff            # review source → target changes
+chezmoi apply -v        # push source → live system; preserve overwrite prompts
 git add -A && git commit -m "descriptive message"
 git push
 ```

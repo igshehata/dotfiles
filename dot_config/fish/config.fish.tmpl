@@ -219,20 +219,31 @@ function cz --description "chezmoi shortcuts"
             # Open source file in editor, auto-applies on save
             chezmoi edit $argv[2..-1]
         case sync s
-            # After a tool/agent modifies local files, sync back to source
-            set -l changes (chezmoi status 2>&1 | string collect)
-            if test -z "$changes"
-                echo "✓ Everything in sync."
-                return 0
+            # Import intentional target drift only when explicit targets are given.
+            set -l targets $argv[2..-1]
+            if test (count $targets) -eq 0
+                echo "Refusing an unscoped re-add. Pass specific target files:"
+                echo "  cz sync ~/.config/example/config.toml"
+                echo ""
+                chezmoi status
+                return 1
             end
-            echo "Local files differ from chezmoi source:"
+
+            for target in $targets
+                set -l source_path (chezmoi source-path "$target")
+                if string match -q '*.tmpl' -- "$source_path"
+                    echo "Cannot re-add templated target: $target" >&2
+                    echo "Use: chezmoi merge $target" >&2
+                    return 1
+                end
+            end
+
+            chezmoi diff $targets
             echo ""
-            chezmoi diff 2>&1
-            echo ""
-            read -P "Re-add these changes to chezmoi source? [y/N] " confirm
+            read -P "Re-add only these targets to chezmoi source? [y/N] " confirm
             if test "$confirm" = y -o "$confirm" = Y
-                chezmoi re-add
-                echo "✓ Synced to chezmoi source."
+                chezmoi re-add $targets
+                echo "✓ Synced selected targets to chezmoi source."
             end
         case diff d
             chezmoi diff $argv[2..-1]
@@ -240,3 +251,6 @@ function cz --description "chezmoi shortcuts"
             command chezmoi $argv
     end
 end
+
+# Pi coding agent (installed under fnm)
+fish_add_path "$HOME/.local/share/fnm/node-versions/v26.5.0/installation/bin"

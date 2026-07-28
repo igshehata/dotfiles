@@ -1,0 +1,6 @@
+# Obsolete files that were previously managed or generated in the wrong location.
+.config/fish/functions/llt.fish
+.config/fish/functions/lt.fish
+.config/nushell/vendor/autoload/wt.nu
+.config/nushell/zoxide.nu
+.config/opencode/package-lock.json

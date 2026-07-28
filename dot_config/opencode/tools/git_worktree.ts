@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
-import cp from "node:child_process"
 import { tool } from "@opencode-ai/plugin"
+import { execGit, tryGit } from "./git_context"
 
 export type WorktreeRecord = {
   worktree: string
@@ -9,52 +9,21 @@ export type WorktreeRecord = {
   branch?: string
 }
 
-export type ReviewWorktreeSuccess = {
+export type WorktreeSuccess = {
   ok: true
   mode: "in_place" | "isolated"
-  reviewBranch: string
-  reviewRef: string
-  reviewPath: string
+  branch: string
+  ref: string
+  path: string
   head: string
   created: boolean
   reused: boolean
 }
 
-export type ReviewWorktreeFailure = {
+export type WorktreeFailure = {
   ok: false
   error: string
   details?: unknown
-}
-
-function execGit(args: string[], cwd: string): string {
-  const result = cp.spawnSync("git", args, {
-    cwd,
-    encoding: "utf8",
-  })
-
-  if (result.error) {
-    throw result.error
-  }
-
-  if (result.status !== 0) {
-    const message = (result.stderr || result.stdout || `git ${args.join(" ")} failed`).trim()
-    throw new Error(message)
-  }
-
-  return (result.stdout || "").trim()
-}
-
-function tryGit(args: string[], cwd: string) {
-  const result = cp.spawnSync("git", args, {
-    cwd,
-    encoding: "utf8",
-  })
-
-  return {
-    ok: result.status === 0,
-    stdout: (result.stdout || "").trim(),
-    stderr: (result.stderr || "").trim(),
-  }
 }
 
 export function parseGitWorktreeList(output: string): WorktreeRecord[] {
@@ -106,7 +75,7 @@ export function parseGitWorktreeList(output: string): WorktreeRecord[] {
   return records
 }
 
-function errorResponse(error: string, details?: unknown): ReviewWorktreeFailure {
+function errorResponse(error: string, details?: unknown): WorktreeFailure {
   return {
     ok: false,
     error,
@@ -124,7 +93,7 @@ function absoluteGitPath(cwd: string, gitPathOutput: string): string {
     : path.resolve(cwd, gitPathOutput)
 }
 
-function deriveWorktreePath(cwd: string, reviewBranch: string): string {
+function deriveWorktreePath(cwd: string, branch: string): string {
   const repoRoot = absoluteGitPath(cwd, execGit(["rev-parse", "--show-toplevel"], cwd))
   const commonDir = absoluteGitPath(cwd, execGit(["rev-parse", "--git-common-dir"], cwd))
   const commonBase = path.basename(commonDir) === ".git"
@@ -134,82 +103,82 @@ function deriveWorktreePath(cwd: string, reviewBranch: string): string {
     ? path.dirname(repoRoot)
     : path.dirname(commonDir)
 
-  return path.join(parentDir, `${commonBase}.${slugBranch(reviewBranch)}`)
+  return path.join(parentDir, `${commonBase}.${slugBranch(branch)}`)
 }
 
-function findBranchWorktree(cwd: string, reviewBranch: string): WorktreeRecord | null {
+function findBranchWorktree(cwd: string, branch: string): WorktreeRecord | null {
   const worktrees = parseGitWorktreeList(execGit(["worktree", "list", "--porcelain"], cwd))
-  return worktrees.find((record) => record.branch === `refs/heads/${reviewBranch}`) || null
+  return worktrees.find((record) => record.branch === `refs/heads/${branch}`) || null
 }
 
-export function ensureReviewWorktree(input: {
+export function ensureWorktree(input: {
   cwd: string
   mode: "in_place" | "isolated"
-  reviewBranch: string
-  reviewRef: string
+  branch: string
+  ref: string
   activeWorktree: string
-}): ReviewWorktreeSuccess | ReviewWorktreeFailure {
-  const { cwd, mode, reviewBranch, reviewRef, activeWorktree } = input
+}): WorktreeSuccess | WorktreeFailure {
+  const { cwd, mode, branch, ref, activeWorktree } = input
 
   try {
     if (mode === "in_place") {
       return {
         ok: true,
         mode,
-        reviewBranch,
-        reviewRef,
-        reviewPath: activeWorktree,
+        branch,
+        ref,
+        path: activeWorktree,
         head: execGit(["rev-parse", "HEAD"], activeWorktree),
         created: false,
         reused: true,
       }
     }
 
-    const existing = findBranchWorktree(cwd, reviewBranch)
+    const existing = findBranchWorktree(cwd, branch)
     if (existing) {
       return {
         ok: true,
         mode,
-        reviewBranch,
-        reviewRef,
-        reviewPath: existing.worktree,
+        branch,
+        ref,
+        path: existing.worktree,
         head: execGit(["rev-parse", "HEAD"], existing.worktree),
         created: false,
         reused: true,
       }
     }
 
-    const targetPath = deriveWorktreePath(cwd, reviewBranch)
-    const localBranchExists = tryGit(["rev-parse", "--verify", reviewBranch], cwd).ok
-    const remoteBranchExists = tryGit(["rev-parse", "--verify", `origin/${reviewBranch}`], cwd).ok
+    const targetPath = deriveWorktreePath(cwd, branch)
+    const localBranchExists = tryGit(["rev-parse", "--verify", branch], cwd).ok
+    const remoteBranchExists = tryGit(["rev-parse", "--verify", `origin/${branch}`], cwd).ok
 
     if (!localBranchExists && !remoteBranchExists) {
-      return errorResponse(`Review branch ${reviewBranch} does not exist locally or on origin.`)
+      return errorResponse(`Branch ${branch} does not exist locally or on origin.`)
     }
 
     if (fs.existsSync(targetPath)) {
       return errorResponse(
-        `Target worktree path ${targetPath} already exists but is not registered as a branch worktree. Clean it up manually, then rerun /review.`,
+        `Target worktree path ${targetPath} already exists but is not registered as a branch worktree. Clean it up manually, then retry.`,
       )
     }
 
     const addArgs = localBranchExists
-      ? ["worktree", "add", targetPath, reviewBranch]
-      : ["worktree", "add", "-b", reviewBranch, targetPath, reviewRef]
+      ? ["worktree", "add", targetPath, branch]
+      : ["worktree", "add", "-b", branch, targetPath, ref]
 
     execGit(addArgs, cwd)
 
-    const created = findBranchWorktree(cwd, reviewBranch)
+    const created = findBranchWorktree(cwd, branch)
     if (!created) {
-      return errorResponse(`Created worktree for ${reviewBranch}, but could not resolve its final path.`)
+      return errorResponse(`Created worktree for ${branch}, but could not resolve its final path.`)
     }
 
     return {
       ok: true,
       mode,
-      reviewBranch,
-      reviewRef,
-      reviewPath: created.worktree,
+      branch,
+      ref,
+      path: created.worktree,
       head: execGit(["rev-parse", "HEAD"], created.worktree),
       created: true,
       reused: false,
@@ -220,35 +189,35 @@ export function ensureReviewWorktree(input: {
 }
 
 export default tool({
-  description: "Ensure the correct worktree exists for a review branch.",
+  description: "Ensure an isolated worktree exists for a given branch.",
   args: {
     mode: tool.schema.string(),
-    reviewBranch: tool.schema.string(),
-    reviewRef: tool.schema.string(),
+    branch: tool.schema.string(),
+    ref: tool.schema.string(),
     activeWorktree: tool.schema.string(),
   },
   async execute(args, context) {
     if (args.mode !== "in_place" && args.mode !== "isolated") {
-      return JSON.stringify(errorResponse(`Invalid review mode ${args.mode}.`), null, 2)
+      return JSON.stringify(errorResponse(`Invalid mode ${args.mode}.`), null, 2)
     }
 
     const cwd = context.directory || process.cwd()
-    const result = ensureReviewWorktree({
+    const result = ensureWorktree({
       cwd,
       mode: args.mode,
-      reviewBranch: args.reviewBranch,
-      reviewRef: args.reviewRef,
+      branch: args.branch,
+      ref: args.ref,
       activeWorktree: args.activeWorktree,
     })
 
     if (result.ok) {
       context.metadata({
-        title: "Review worktree ready",
+        title: "Worktree ready",
         metadata: {
           mode: result.mode,
-          reviewBranch: result.reviewBranch,
+          branch: result.branch,
           created: result.created,
-          reviewPath: result.reviewPath,
+          path: result.path,
         },
       })
     }

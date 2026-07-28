@@ -4,8 +4,9 @@ import path from "node:path"
 import cp from "node:child_process"
 import { describe, expect, it } from "bun:test"
 
-import { parseRawArguments, prepareReviewContext } from "../tools/review_context"
-import { ensureReviewWorktree } from "../tools/review_worktree"
+import { parseRawArguments, resolveGitContext } from "../tools/git_context"
+import { resolveReviewContext } from "../tools/review_context"
+import { ensureWorktree } from "../tools/git_worktree"
 
 function execGit(args: string[], cwd: string) {
   const result = cp.spawnSync("git", args, {
@@ -30,11 +31,15 @@ function setupRepo() {
   execGit(["config", "user.name", "Review Workflow Test"], repo)
   execGit(["config", "user.email", "review-workflow@example.com"], repo)
 
+  fs.mkdirSync(path.join(repo, "src"))
   fs.writeFileSync(path.join(repo, "README.md"), "base\n")
-  execGit(["add", "README.md"], repo)
+  fs.writeFileSync(path.join(repo, "src", "App.tsx"), "export const App = () => null\n")
+  execGit(["add", "README.md", "src/App.tsx"], repo)
   execGit(["commit", "-m", "base commit"], repo)
   execGit(["branch", "-M", "develop"], repo)
   execGit(["push", "-u", "origin", "develop"], repo)
+  execGit(["branch", "main"], repo)
+  execGit(["push", "origin", "main"], repo)
 
   execGit(["checkout", "-b", "feat/performance-tracker"], repo)
   fs.writeFileSync(path.join(repo, "performance.txt"), "performance\n")
@@ -47,110 +52,223 @@ function setupRepo() {
   return { root, repo }
 }
 
-describe("review workflow helpers", () => {
-  it("parses one positional argument as the branch to review", () => {
+describe("git_context", () => {
+  it("parses positional arguments", () => {
     expect(parseRawArguments("")).toEqual({
-      reviewBranchInput: null,
+      branchInput: null,
       targetBranch: "develop",
-      requestedFeatures: [],
     })
 
     expect(parseRawArguments("feat/performance-tracker")).toEqual({
-      reviewBranchInput: "feat/performance-tracker",
+      branchInput: "feat/performance-tracker",
       targetBranch: "develop",
-      requestedFeatures: [],
     })
 
-    expect(parseRawArguments("feat/performance-tracker main features=auth,billing")).toEqual({
-      reviewBranchInput: "feat/performance-tracker",
+    expect(parseRawArguments("feat/performance-tracker main")).toEqual({
+      branchInput: "feat/performance-tracker",
       targetBranch: "main",
-      requestedFeatures: ["auth", "billing"],
     })
   })
 
-  it("allows in-place review of dirty local changes", () => {
+  it("parses named arguments", () => {
+    expect(parseRawArguments("branch=feat/x target=main")).toEqual({
+      branchInput: "feat/x",
+      targetBranch: "main",
+    })
+  })
+
+  it("resolves in-place context for dirty local changes", () => {
     const { repo } = setupRepo()
 
     execGit(["checkout", "-b", "feat/local-current"], repo)
     fs.writeFileSync(path.join(repo, "dirty.txt"), "dirty\n")
 
-    const result = prepareReviewContext({
+    const result = resolveGitContext({
       cwd: repo,
       worktree: repo,
       rawArguments: "",
     })
 
     expect(result.ok).toBe(true)
-    if (!result.ok) {
-      return
-    }
+    if (!result.ok) return
 
     expect(result.mode).toBe("in_place")
-    expect(result.reviewBranch).toBe("feat/local-current")
+    expect(result.branch).toBe("feat/local-current")
     expect(result.branchChangedFiles).toEqual([])
     expect(result.hasLocalChanges).toBe(true)
     expect(result.localChangedFiles).toContain("dirty.txt")
     expect(result.changedFiles).toContain("dirty.txt")
   })
 
-  it("isolates another branch even when the caller worktree is dirty", () => {
+  it("resolves isolated context for another branch", () => {
     const { repo } = setupRepo()
 
     execGit(["branch", "-D", "feat/performance-tracker"], repo)
     execGit(["checkout", "-b", "feat/current-work"], repo)
     fs.writeFileSync(path.join(repo, "current.txt"), "current\n")
 
-    const context = prepareReviewContext({
+    const result = resolveGitContext({
       cwd: repo,
       worktree: repo,
       rawArguments: "feat/performance-tracker",
     })
 
-    expect(context.ok).toBe(true)
-    if (!context.ok) {
-      return
-    }
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
 
-    expect(context.mode).toBe("isolated")
-    expect(context.reviewBranch).toBe("feat/performance-tracker")
-    expect(context.reviewRef).toBe("origin/feat/performance-tracker")
-    expect(context.changedFiles).toContain("performance.txt")
-    expect(context.changedFiles).not.toContain("current.txt")
-    expect(context.hasLocalChanges).toBe(false)
+    expect(result.mode).toBe("isolated")
+    expect(result.branch).toBe("feat/performance-tracker")
+    expect(result.ref).toBe("origin/feat/performance-tracker")
+    expect(result.changedFiles).toContain("performance.txt")
+    expect(result.changedFiles).not.toContain("current.txt")
+    expect(result.hasLocalChanges).toBe(false)
+  })
 
-    const ensured = ensureReviewWorktree({
+  it("errors when branch and target are the same", () => {
+    const { repo } = setupRepo()
+
+    const result = resolveGitContext({
       cwd: repo,
-      mode: context.mode,
-      reviewBranch: context.reviewBranch,
-      reviewRef: context.reviewRef,
-      activeWorktree: context.activeWorktree,
+      worktree: repo,
+      rawArguments: "develop",
     })
 
-    expect(ensured.ok).toBe(true)
-    if (!ensured.ok) {
-      return
-    }
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain("both resolve to develop")
+  })
+})
 
-    expect(ensured.created).toBe(true)
-    expect(ensured.reused).toBe(false)
-    expect(ensured.reviewPath).not.toBe(repo)
-    expect(execGit(["branch", "--show-current"], ensured.reviewPath)).toBe("feat/performance-tracker")
+describe("review_context", () => {
+  it("treats an explicit develop branch as a full-project review", () => {
+    const { repo } = setupRepo()
 
-    const reused = ensureReviewWorktree({
+    const result = resolveReviewContext({
       cwd: repo,
-      mode: context.mode,
-      reviewBranch: context.reviewBranch,
-      reviewRef: context.reviewRef,
-      activeWorktree: context.activeWorktree,
+      worktree: repo,
+      rawArguments: "develop",
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.reviewScope).toBe("full_project")
+    expect(result.mode).toBe("in_place")
+    expect(result.branch).toBe("develop")
+    expect(result.targetBranch).toBe("develop")
+    expect(result.changedFiles).toEqual([])
+    expect(result.reviewFileCount).toBe(2)
+    expect(result.shouldLoadVercelReactBestPractices).toBe(true)
+  })
+
+  it("treats the active base branch as a full-project review without arguments", () => {
+    const { repo } = setupRepo()
+
+    const result = resolveReviewContext({
+      cwd: repo,
+      worktree: repo,
+      rawArguments: "",
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.reviewScope).toBe("full_project")
+    expect(result.branch).toBe("develop")
+  })
+
+  it("treats main with an identical target as a full-project review", () => {
+    const { repo } = setupRepo()
+
+    for (const rawArguments of ["main", "main target=main"]) {
+      const result = resolveReviewContext({
+        cwd: repo,
+        worktree: repo,
+        rawArguments,
+      })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) continue
+
+      expect(result.reviewScope).toBe("full_project")
+      expect(result.mode).toBe("isolated")
+      expect(result.branch).toBe("main")
+      expect(result.targetBranch).toBe("main")
+      expect(result.reviewFileCount).toBe(2)
+    }
+  })
+
+  it("still rejects identical non-base review and target branches", () => {
+    const { repo } = setupRepo()
+
+    const result = resolveReviewContext({
+      cwd: repo,
+      worktree: repo,
+      rawArguments: "feat/performance-tracker target=feat/performance-tracker",
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain("both resolve to feat/performance-tracker")
+  })
+})
+
+describe("git_worktree", () => {
+  it("returns active worktree for in_place mode", () => {
+    const { repo } = setupRepo()
+
+    const result = ensureWorktree({
+      cwd: repo,
+      mode: "in_place",
+      branch: "develop",
+      ref: "develop",
+      activeWorktree: repo,
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.mode).toBe("in_place")
+    expect(result.path).toBe(repo)
+    expect(result.created).toBe(false)
+    expect(result.reused).toBe(true)
+  })
+
+  it("creates and reuses isolated worktrees", () => {
+    const { repo } = setupRepo()
+
+    execGit(["branch", "-D", "feat/performance-tracker"], repo)
+    execGit(["checkout", "-b", "feat/current-work"], repo)
+
+    const created = ensureWorktree({
+      cwd: repo,
+      mode: "isolated",
+      branch: "feat/performance-tracker",
+      ref: "origin/feat/performance-tracker",
+      activeWorktree: repo,
+    })
+
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+
+    expect(created.created).toBe(true)
+    expect(created.reused).toBe(false)
+    expect(created.path).not.toBe(repo)
+    expect(execGit(["branch", "--show-current"], created.path)).toBe("feat/performance-tracker")
+
+    const reused = ensureWorktree({
+      cwd: repo,
+      mode: "isolated",
+      branch: "feat/performance-tracker",
+      ref: "origin/feat/performance-tracker",
+      activeWorktree: repo,
     })
 
     expect(reused.ok).toBe(true)
-    if (!reused.ok) {
-      return
-    }
+    if (!reused.ok) return
 
     expect(reused.created).toBe(false)
     expect(reused.reused).toBe(true)
-    expect(reused.reviewPath).toBe(ensured.reviewPath)
+    expect(reused.path).toBe(created.path)
   })
 })
