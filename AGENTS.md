@@ -6,98 +6,121 @@ This is a **chezmoi** source directory. All edits to dotfiles MUST happen here �
 
 **Edit source files in THIS repo. Run `chezmoi apply` to push changes to the live system.**
 
-Never run an **unscoped** `chezmoi re-add`. A scoped `chezmoi re-add <target>` is allowed only after reviewing and intentionally accepting target drift; templates must be merged or edited in source instead. Never edit files under `~/` directly. The flow is always: source → apply → destination.
+Never run an **unscoped** `chezmoi re-add`. A scoped re-add is allowed only after reviewing and intentionally accepting target drift; templates must be merged or edited in source instead. Never edit files under `~/` directly. The flow is always: source → apply → destination.
 
-## Session Start — Consolidation Protocol
+Exception: `~/.config/chezmoi/chezmoi.toml` is machine-local and deliberately NOT managed (see `.chezmoiignore`). Edit it directly, or let the migration script fill in the values it owns.
 
-**Before making any edits, ALWAYS run these steps first:**
+## Cross-Machine Sync
 
-```bash
-git status              # inspect existing source changes
-git pull --rebase --autostash  # bring in changes from other machines safely
-chezmoi status          # identify source changes vs target drift
-chezmoi diff            # review what apply would change
-```
-
-If target files have drifted, review each file before continuing. Never bulk-import drift. Use `chezmoi merge <target>` for templates or conflicts, and use `chezmoi re-add <target>` only for specific non-template files whose target changes are intentional.
-
-If `git pull` produces conflicts, resolve them with the user before continuing. If secret-backed templates prevent a global status/diff, inspect the affected targets with scoped commands.
-
-Only after consolidation is complete should you proceed with the user's requested edits.
-
-## After Editing
+`cz` is defined in `dot_config/fish/config.fish.tmpl`; it is the supported workflow on every machine.
 
 ```bash
-chezmoi diff            # review source → target changes
-chezmoi apply -v        # push source → live system; preserve overwrite prompts
-git add -A && git commit -m "descriptive message"
-git push
+cz sync              # the whole handshake: send, then receive
+cz capture <target>  # import intentional drift from ~ into the source (guarded; refuses templates)
+cz push ["msg"]      # commit + push source changes
+cz diff <target>     # source → destination diff
+cz edit <target>     # edit the source of a target; applies on save
+cz status            # passthrough to chezmoi
 ```
+
+`cz sync` runs, in order:
+
+1. **send** — commits and pushes any uncommitted source changes (so local work is never stranded),
+2. **drift gate** — refuses to continue if `~` holds edits that exist only in `~`. chezmoi would prompt for each one (or clobber it), so instead it prints the exact keep-local / keep-source command per file,
+3. **receive** — `chezmoi git pull -- --autostash --rebase`, then `chezmoi apply`.
+
+Composition, not magic: `chezmoi update` is exactly step 3, and `chezmoi push` (2.73+) is `git add` + `commit` + `push`.
+
+## Two Traps That Cost Real Debugging Time
+
+1. **Never call a password manager from a template.** `{{ onepasswordRead ... }}` is evaluated by *every* command that computes target state — `status`, `diff`, `apply` — so each of them fires a Touch ID prompt, and the session-start protocol alone fired several. Keep secrets in the machine-local config `[data]` and read them as `{{ .the_key }}`. Guard new keys with `{{ if hasKey . "the_key" }}`: chezmoi evaluates templates with `missingkey=error`, so a bare `{{ .the_key }}` turns into a hard failure on every machine that has not been migrated yet. `atuin_sync_key` uses this pattern and keeps an `onepasswordRead` fallback for unmigrated machines.
+2. **Pin `umask` in `chezmoi.toml`.** chezmoi derives target file modes from the invoking shell's umask, so from a `umask 000` shell every managed file reports as modified (`old mode 100644 / new mode 100666`) — 160 phantom entries, no real drift. `umask = 0o22` in `~/.config/chezmoi/chezmoi.toml` (and in `.chezmoi.toml.tmpl`) makes `status` and `apply` shell-independent.
+
+## Pushing Changes To Other Machines
+
+Classify every change before pushing:
+
+- **Additive** — new tracked files, new ignore rules, new commands. Safe: worst case another machine already has its own copy, and chezmoi prompts instead of clobbering.
+- **Requires new machine-local data** — BREAKS machines that lack it, as a hard template error. `chezmoi apply` is all-or-nothing (the full target state is computed before anything is written), so the machine keeps working but cannot apply. Ship the fallback in the same commit (`hasKey`), and let `run_onchange_after_40-migrate-machine-config.sh` self-migrate each machine on its next apply.
+- **Destructive** — deletions, `.chezmoiremove`, `exact_` directories, scripts that uninstall or move files. The only category that can lose data on another machine, so never ride along with a normal push. Stage it: push the addition, let every machine apply and settle, then push the removal. For anything larger, push to a `next` branch, have each machine `chezmoi git checkout next` and apply, then merge to `main` once every machine is migrated.
+- **Needs a newer chezmoi** — add `.chezmoiversion` so an old machine fails loudly instead of misbehaving.
+
+Default posture: prefer additive changes with fallbacks; never require a machine-local value and consume it in the same commit.
+
+## Session Start
+
+```bash
+cz sync              # send local work, gate on drift, pull + apply
+```
+
+If `cz sync` stops at the drift gate, resolve each reported file first:
+
+- `cz capture <target>` — keep the `~` version (plain files),
+- `chezmoi merge <target>` — keep the `~` version of a template,
+- `chezmoi apply --force <target>` — discard the `~` version.
+
+Then write/commit source edits from this repo, `chezmoi apply`, and `cz push`.
 
 ## Path Mapping
 
-Chezmoi uses naming conventions to map source paths → destination paths:
-
-| Source (this repo)                         | Destination (live system)                    |
-|--------------------------------------------|----------------------------------------------|
-| `dot_config/fish/config.fish.tmpl`         | `~/.config/fish/config.fish`                 |
-| `dot_config/fish/functions/myfunc.fish`    | `~/.config/fish/functions/myfunc.fish`       |
-| `dot_config/ghostty/config`               | `~/.config/ghostty/config`                   |
-| `dot_gitconfig.tmpl`                       | `~/.gitconfig`                               |
-| `dot_gitignore_global`                     | `~/.gitignore_global`                        |
-| `nix-config/private_configuration.nix.tmpl`| `~/nix-config/configuration.nix`             |
-| `dot_config/opencode/opencode.jsonc`       | `~/.config/opencode/opencode.jsonc`          |
+| Source (this repo)                          | Destination (live system)                    |
+|---------------------------------------------|----------------------------------------------|
+| `dot_config/fish/config.fish.tmpl`          | `~/.config/fish/config.fish`                 |
+| `dot_config/ghostty/config`                 | `~/.config/ghostty/config`                   |
+| `dot_gitconfig.tmpl`                        | `~/.gitconfig`                               |
+| `dot_omp/private_agent/private_config.yml`  | `~/.omp/agent/config.yml` (dir 0700)         |
+| `nix-config/private_configuration.nix.tmpl` | `~/nix-config/configuration.nix`             |
 
 ### Naming rules
 
-- `dot_` prefix → `.` in destination (e.g., `dot_config` → `.config`)
-- `private_` prefix → file gets 0600 permissions (strip prefix in destination name)
-- `.tmpl` suffix → file is a Go template (strip suffix in destination name)
-- Directories follow the same `dot_` / `private_` rules
-- `exact_` prefix → directory is exact (chezmoi removes unmanaged files in it)
+- `dot_` prefix → `.` in destination (e.g. `dot_config` → `.config`)
+- `private_` prefix → 0600 file / 0700 directory (strip prefix in destination name)
+- `.tmpl` suffix → Go template (strip suffix in destination name)
+- `exact_` prefix → directory is exact (chezmoi removes unmanaged files in it) — destructive, see above
 
-### To find the source path for any managed file:
+### To find the source path for any managed file
 
 ```bash
 chezmoi source-path ~/.config/fish/config.fish
-# → /Users/islam.shehata/.local/share/chezmoi/dot_config/fish/config.fish.tmpl
 ```
+
+## What Is Tracked
+
+| Tool | Tracked | Deliberately not tracked |
+|---|---|---|
+| fish / nushell / zsh / tmux / nvim / starship | full config | histories, `fish_variables`, tmux plugins, nvim README/LICENSE |
+| **omp** | `~/.omp/agent/{config.yml,mcp.json,pi-hunk.json}` (`private_`) | `~/.omp/`: dbs, `logs/`, `cache/`, `webcache/`, `sessions/`, `run/`, `blobs/`, `managed-skills/`, `natives/`, `plugins/`, `install-id`, `stats.db*`, `autoqa.db*` |
+| **zed** | `~/.config/zed/settings.json` | `~/.config/zed/prompts/` (prompt DB) |
+| **herdr** | `~/.config/herdr/config.toml` | logs, `session*.json`, `release-notes.json`, `.plugins.lock` |
+| atuin | `~/.config/atuin/config.toml` (templated) | `~/.local/share/atuin/` (history, records, key) |
+| **tern** | nothing — see below | everything |
+| 1Password / gh / copilot / docker / kube / raycast | nothing | auth tokens, machine state |
+
+Tool-rewritten config (omp `config.yml`, zed `settings.json`, hunk `config.toml`) drifts whenever the app writes it. That is expected: `cz sync` reports it, `cz capture <target>` imports it.
+
+Tern (`so.stencil.tern`) has **no Homebrew cask** (it is a closed beta distributed outside brew) and writes no user config file — only runtime state in `~/Library/Application Support/Tern/` (sockets, locks, `daemon.state`). Nothing to track; it cannot be declared in `nix-config` casks until a cask exists.
 
 ## Common Tasks
 
-### Add a fish function
+Add a fish function: create `dot_config/fish/functions/<name>.fish`, then `chezmoi apply`.
 
-Create a new file at `dot_config/fish/functions/<name>.fish` in this repo, then:
-```bash
-chezmoi apply
-```
+Edit an existing config: edit the source in this repo, then `chezmoi apply`.
 
-### Add to an existing config (e.g., fish config)
-
-Edit `dot_config/fish/config.fish.tmpl` in this repo, then:
-```bash
-chezmoi apply
-```
-
-### Add a nix package
-
-The `nix` fish function wrapper already handles this — it edits the chezmoi source directly. Use:
-```bash
-nix add <package>        # adds to nix packages
-nix add --brew <pkg>     # adds to homebrew brews
-nix add --cask <pkg>     # adds to homebrew casks
-```
-
-### Track a new file
+Add a nix package — the `nix` fish wrapper edits the chezmoi source directly:
 
 ```bash
-chezmoi add ~/.config/something/config.toml
+nix add <package>        # nix packages
+nix add --brew <pkg>     # homebrew brews
+nix add --cask <pkg>     # homebrew casks
 ```
 
-### Template variables
+Track a file the app itself rewrites (omp, zed, hunk): `chezmoi add ~/path/to/file` (adds it as source), then `cz push`.
 
-Available in `.tmpl` files via `{{ .variable }}`:
+## Template Variables
 
-- `{{ .git_name }}` — full name
-- `{{ .git_work_email }}` — work email
-- `{{ .git_personal_email }}` — personal email
+From `~/.config/chezmoi/chezmoi.toml` (machine-local, not in git):
+
+- `{{ .git_name }}`, `{{ .git_work_email }}`, `{{ .git_personal_email }}`
+- `{{ .atuin_sync_key }}` — atuin sync key, sourced from 1Password once per machine
+
+Built in by chezmoi: `{{ .chezmoi.hostname }}`, `{{ .chezmoi.os }}`, `{{ .chezmoi.arch }}`.

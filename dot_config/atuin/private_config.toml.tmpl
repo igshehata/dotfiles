@@ -31,15 +31,19 @@
 ## address of the sync server
 # sync_address = "https://api.atuin.sh"
 
-## sync encryption key - machine-local, from chezmoi config data (atuin_sync_key).
-## Source of truth: 1Password item op://Dev/AtuinSyncKey/notesPlain. It is copied into
+## sync encryption key - machine-local, read from chezmoi config data (atuin_sync_key).
+## Source of truth: 1Password item op://Dev/AtuinSyncKey/notesPlain. Copy it into
 ## ~/.config/chezmoi/chezmoi.toml once per machine so that chezmoi apply/status/diff
 ## never invoke the 1Password CLI (which prompts for Touch ID on every call).
-## Refresh after rotating the 1Password item:
-##   op read op://Dev/AtuinSyncKey/notesPlain
-##   # then update atuin_sync_key in ~/.config/chezmoi/chezmoi.toml and run:
-##   chezmoi apply ~/.config/atuin/config.toml
+## The onepasswordRead fallback below exists only for machines that have not been
+## migrated yet - do not remove it until every machine has atuin_sync_key set.
+## Migrate a machine:  op read op://Dev/AtuinSyncKey/notesPlain
+##                     then add it as atuin_sync_key in ~/.config/chezmoi/chezmoi.toml
+{{ if hasKey . "atuin_sync_key" -}}
 sync_key = {{ .atuin_sync_key | quote }}
+{{ else -}}
+sync_key = "{{ onepasswordRead "op://Dev/AtuinSyncKey/notesPlain" }}"
+{{ end -}}
 
 ## how often to sync history. note that this is only triggered when a command
 ## is ran, so sync intervals may well be longer

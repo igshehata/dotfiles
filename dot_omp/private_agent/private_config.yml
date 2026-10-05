@@ -1,0 +1,145 @@
+providers:
+  openai-codex:
+    codeMode: auto
+symbolPreset: nerd
+theme:
+  dark: titanium
+setupVersion: 2
+terminal:
+  showProgress: false
+display:
+  showTokenUsage: true
+  cacheMissMarker: true
+  smoothStreaming: true
+  showTurnTime: true
+advisor:
+  enabled: false
+  syncBacklog: "1"
+memory:
+  backend: mnemopi
+checkpoint:
+  enabled: true
+vault:
+  enabled: true
+github:
+  enabled: true
+browser:
+  cmux: true
+  headless: false
+mcp:
+  notifications: true
+dev:
+  autoqaConsent: granted
+plan:
+  defaultOnStartup: false
+  enabled: false
+task:
+  enableLsp: true
+  agentAdvisor:
+    task: "on"
+  disabledAgents:
+    []
+  showResolvedModelBadge: true
+  eager: preferred
+  enableEffort: false
+  prewalk: true
+  isolation:
+    enabled: true
+modelRoles:
+  plan: openai-codex/gpt-6-astra:max
+  smol: openai-codex/gpt-6-luna:high
+  tiny: opencode-go/deepseek-v4.1-flash:auto
+  commit: opencode-go/deepseek-v4.1-flash:auto
+  default: opencode-go/deepseek-v4.1-flash:high
+  advisor: openai-codex/gpt-6-astra:max
+  web: openai-codex/gpt-5.6-luna
+disabledExtensions:
+  - skill:dp-playground
+  - skill:design
+  - skill:leetcode
+  - skill:obsidian
+  - skill:review
+  - slash-command:code-review:code-review
+  - slash-command:agent-sdk-dev:new-sdk-app
+  - context-file:user:CLAUDE.md
+tui:
+  codexResetFireworks: true
+  textSizing: false
+  tight: false
+  imeSafeCursor: false
+autolearn:
+  enabled: true
+  autoContinue: true
+mnemopi:
+  scoping: global
+computer:
+  enabled: true
+security:
+  enabled: true
+composer:
+  shape: band
+autoResume: true
+bashInterceptor:
+  enabled: true
+statusLine:
+  separator: powerline
+  transparent: false
+  compactThinkingLevel: false
+  showHookStatus: true
+  sessionAccent: false
+showHardwareCursor: true
+steeringMode: one-at-a-time
+followUpMode: one-at-a-time
+interruptMode: immediate
+doubleEscapeAction: rewind
+treeFilterMode: default
+spelling:
+  autocorrect: false
+error:
+  notify: "on"
+compaction:
+  handoffSaveToDisk: true
+astGrep:
+  enabled: true
+generate_image:
+  enabled: true
+speechgen:
+  enabled: false
+worktree:
+  cleanSource: true
+retry:
+  fallbackChains:
+    web:
+      - web/parallel
+      - web/perplexity
+      - google-gemini-cli/gemini-2.5-flash
+      - google-antigravity/gemini-2.5-flash
+      - google/gemini-2.5-flash
+      - anthropic/claude-haiku-4-5
+      - openai-codex/gpt-6-luna
+      - openai-codex/gpt-5.6
+      - openai-codex/gpt-5.5
+      - openai/gpt-6-luna
+      - openai/gpt-5.6-luna
+      - xai/grok-4.5
+      - xai-oauth/grok-4.5
+      - web/zai
+      - web/exa
+      - web/tinyfish
+      - web/jina
+      - web/kagi
+      - web/tavily
+      - web/firecrawl
+      - web/brave
+      - web/kimi
+      - web/synthetic
+      - web/ollama
+      - web/searxng
+      - web/startpage
+      - web/duckduckgo
+      - web/ecosia
+      - web/google
+      - web/mojeek
+      - web/public
+codexResets:
+  autoRedeem: "no"

@@ -7,6 +7,72 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  "show_wrap_guides": true,
+  "preferred_line_length": 120,
+  "project_panel": {
+    "dock": "right"
+  },
+  "outline_panel": {
+    "dock": "right"
+  },
+  "collaboration_panel": {
+    "dock": "right"
+  },
+  "agent": {
+    "dock": "left",
+    "favorite_models": [],
+    "model_parameters": []
+  },
+  "git_panel": {
+    "dock": "right"
+  },
+  "proxy": "",
+  "terminal": {
+    "toolbar": {
+      "breadcrumbs": true
+    },
+    "copy_on_select": true,
+    "shell": {
+      "program": "fish"
+    }
+  },
+  "bottom_dock_layout": "contained",
+  "tab_bar": {
+    "show_pinned_tabs_in_separate_row": false
+  },
+  "tabs": {
+    "show_close_button": "hover",
+    "file_icons": true,
+    "git_status": true
+  },
+  "title_bar": {
+    "show_menus": true
+  },
+  "colorize_brackets": true,
+  "code_lens": "on",
+  "format_on_save": "on",
+  "indent_guides": {
+    "background_coloring": "indent_aware"
+  },
+  "soft_wrap": "prefer_line",
+  "vim": {
+    "cursor_shape": {
+      "visual": "hollow"
+    },
+    "show_edit_predictions_in_normal_mode": true,
+    "toggle_relative_line_numbers": true
+  },
+  "toolbar": {
+    "code_actions": true
+  },
+  "auto_signature_help": true,
+  "sticky_scroll": {
+    "enabled": true
+  },
+  "mouse_wheel_zoom": true,
+  "redact_private_values": true,
+  "icon_theme": "Catppuccin Mocha",
+  "cli_default_open_behavior": "existing_window",
   "session": {
     "trust_all_worktrees": true
   },
@@ -16,6 +82,6 @@
   "theme": {
     "mode": "system",
     "light": "One Light",
-    "dark": "One Dark",
+    "dark": "Tokyo Night Storm",
   },
 }

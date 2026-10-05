@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# chezmoi-config-migration-v1
+#
+# Fills in machine-local values that newer source state requires but that an
+# already-provisioned machine may be missing. Re-runs only when this script's
+# content changes, and exits immediately once the machine is migrated. It never
+# fails an apply: worst case it prints what to do by hand.
+#
+#   umask = 0o22      top-level. Pins target file modes so `chezmoi status`
+#                     does not depend on the invoking shell's umask (a 000
+#                     umask makes chezmoi compute mode 666 and report every
+#                     managed file as modified).
+#   atuin_sync_key    [data]. 1Password-sourced. Keeping it in the config means
+#                     ordinary chezmoi runs never invoke the `op` CLI, which
+#                     prompts for Touch ID on every call.
+#
+# chezmoi has already loaded the config for the current run, so anything written
+# here takes effect from the next `chezmoi apply`.
+
+set -uo pipefail
+
+cfg="${HOME}/.config/chezmoi/chezmoi.toml"
+
+if [[ ! -f "$cfg" ]]; then
+    echo "chezmoi: no config at $cfg - run 'chezmoi init' first" >&2
+    exit 0
+fi
+
+need_umask=0
+grep -qE '^[[:space:]]*umask[[:space:]]*=' "$cfg" || need_umask=1
+need_key=0
+grep -qE '^[[:space:]]*atuin_sync_key[[:space:]]*=' "$cfg" || need_key=1
+
+if [[ $need_umask -eq 0 && $need_key -eq 0 ]]; then
+    exit 0
+fi
+
+key=""
+if [[ $need_key -eq 1 ]] && command -v op >/dev/null 2>&1; then
+    # Touch ID has to be approved by hand, so allow a generous window, but never
+    # let a locked/absent 1Password app block `chezmoi apply` indefinitely.
+    if command -v perl >/dev/null 2>&1; then
+        key="$(perl -e 'alarm shift; exec @ARGV' 60 op read 'op://Dev/AtuinSyncKey/notesPlain' 2>/dev/null || true)"
+    else
+        key="$(op read 'op://Dev/AtuinSyncKey/notesPlain' 2>/dev/null || true)"
+    fi
+fi
+
+python3 - "$cfg" "$key" "$need_umask" "$need_key" <<'PY'
+import json, pathlib, re, sys
+
+path = pathlib.Path(sys.argv[1])
+key = sys.argv[2]
+need_umask = sys.argv[3] == "1"
+need_key = sys.argv[4] == "1"
+text = original = path.read_text()
+
+# `umask` is a top-level key, so it must be inserted before the first table.
+if need_umask and not re.search(r"(?m)^\s*umask\s*=", text):
+    head = "umask = 0o22\n\n"
+    m = re.search(r"(?m)^\[", text)
+    text = text[: m.start()] + head + text[m.start():] if m else text.rstrip("\n") + "\n\n" + head
+
+# `atuin_sync_key` belongs to the template data table.
+if need_key and key and not re.search(r"(?m)^\s*atuin_sync_key\s*=", text):
+    entry = "    atuin_sync_key = " + json.dumps(key) + "\n"
+    if re.search(r"(?m)^\[data\]\s*$", text):
+        text = text.rstrip("\n") + "\n" + entry
+    else:
+        text = text.rstrip("\n") + "\n\n[data]\n" + entry
+
+if text != original:
+    path.write_text(text)
+    path.chmod(0o600)
+    print("chezmoi: migrated machine-local config " + str(path))
+PY
+
+if [[ $need_key -eq 1 && -z "$key" ]]; then
+    echo "chezmoi: could not read the atuin sync key from 1Password." >&2
+    echo "  Run:  op read 'op://Dev/AtuinSyncKey/notesPlain'" >&2
+    echo "  then add it as atuin_sync_key in ${cfg} and run: chezmoi apply" >&2
+fi
+
+exit 0

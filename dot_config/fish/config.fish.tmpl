@@ -213,35 +213,26 @@ function nix
 end
 
 # chezmoi workflow helpers
-function __cz_source_dir --description "Print the chezmoi source directory"
-    chezmoi execute-template '{{ .chezmoi.sourceDir }}' 2>/dev/null
-end
-
 function __cz_push --description "Commit and push dotfiles source changes"
-    set -l src (__cz_source_dir)
-    if test -z "$src"
-        echo "cz: cannot resolve the chezmoi source dir" >&2
-        return 1
-    end
-
-    if test -z (command git -C $src status --porcelain)
+    set -l dirty (chezmoi git -- status --porcelain 2>/dev/null)
+    if test (count $dirty) -eq 0
         echo "✓ Source tree clean — nothing to send."
         return 0
     end
 
     echo "→ Source changes to send:"
-    command git -C $src status --short
+    chezmoi git -- status --short
 
-    command git -C $src add -A
+    chezmoi git -- add -A
     set -l msg $argv[1]
     if test -z "$msg"
         set msg "chore(dotfiles): sync from "(hostname)
     end
-    if not command git -C $src commit -q -m "$msg"
+    if not chezmoi git -- commit -q -m "$msg"
         echo "cz: commit failed" >&2
         return 1
     end
-    if not command git -C $src push
+    if not chezmoi git -- push
         echo "cz: push failed" >&2
         return 1
     end
@@ -310,8 +301,12 @@ function cz --description "chezmoi shortcuts"
             echo ""
             read -P "Re-add only these targets to chezmoi source? [y/N] " confirm
             if test "$confirm" = y -o "$confirm" = Y
-                chezmoi re-add $targets
-                echo "✓ Captured in source. Run 'cz sync' to send it."
+                if chezmoi re-add $targets
+                    echo "✓ Captured in source. Run 'cz sync' to send it."
+                else
+                    echo "cz: re-add failed — nothing captured." >&2
+                    return 1
+                end
             end
         case push p
             __cz_push $argv[2..-1]
@@ -334,7 +329,7 @@ function cz --description "chezmoi shortcuts"
             # 3. receive: pull --autostash --rebase, then apply
             echo "→ Pulling from origin"
             if not chezmoi git pull -- --autostash --rebase
-                echo "✗ pull failed — resolve the conflict in "(__cz_source_dir)", then re-run cz sync" >&2
+                echo "✗ pull failed — resolve the conflict in the source dir (chezmoi cd), then re-run cz sync" >&2
                 return 1
             end
 

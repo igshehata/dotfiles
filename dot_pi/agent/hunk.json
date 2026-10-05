@@ -1,8 +1,13 @@
 {
-  "bindings": {
-    "toggle": "ctrl+shift+h"
+  "review": "off",
+  "followEdits": true,
+  "hunk": {
+    "command": "hunk",
+    "args": ["diff", "HEAD", "--watch"]
   },
-  "overlay": {
-    "layout": "full"
+  "bindings": {
+    "prefix": "ctrl+space",
+    "open": "h",
+    "show": "s"
   }
 }
