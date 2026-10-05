@@ -1,6 +1,9 @@
 {{- $git_name := promptStringOnce . "git_name" "Your full name" -}}
 {{- $git_work_email := promptStringOnce . "git_work_email" "Work email (current employer)" -}}
 {{- $git_personal_email := promptStringOnce . "git_personal_email" "Personal email" -}}
+{{- $atuin_sync_key := promptStringOnce . "atuin_sync_key" "Atuin sync key (op://Dev/AtuinSyncKey/notesPlain)" -}}
+
+umask = 0o22
 
 [edit]
     command = "nvim"
@@ -10,3 +13,4 @@
     git_name = {{ $git_name | quote }}
     git_work_email = {{ $git_work_email | quote }}
     git_personal_email = {{ $git_personal_email | quote }}
+    atuin_sync_key = {{ $atuin_sync_key | quote }}

@@ -213,17 +213,85 @@ function nix
 end
 
 # chezmoi workflow helpers
+function __cz_source_dir --description "Print the chezmoi source directory"
+    chezmoi execute-template '{{ .chezmoi.sourceDir }}' 2>/dev/null
+end
+
+function __cz_push --description "Commit and push dotfiles source changes"
+    set -l src (__cz_source_dir)
+    if test -z "$src"
+        echo "cz: cannot resolve the chezmoi source dir" >&2
+        return 1
+    end
+
+    if test -z (command git -C $src status --porcelain)
+        echo "✓ Source tree clean — nothing to send."
+        return 0
+    end
+
+    echo "→ Source changes to send:"
+    command git -C $src status --short
+
+    command git -C $src add -A
+    set -l msg $argv[1]
+    if test -z "$msg"
+        set msg "chore(dotfiles): sync from "(hostname)
+    end
+    if not command git -C $src commit -q -m "$msg"
+        echo "cz: commit failed" >&2
+        return 1
+    end
+    if not command git -C $src push
+        echo "cz: push failed" >&2
+        return 1
+    end
+    echo "✓ Pushed: $msg"
+end
+
+function __cz_drift --description "Report local edits in ~ that are not captured in the source repo"
+    set -l drift
+    for line in (chezmoi status --path-style absolute 2>/dev/null)
+        # First column non-blank == the file in ~ was edited after chezmoi wrote it.
+        if not string match -q ' *' -- $line
+            set -a drift $line
+        end
+    end
+
+    if test (count $drift) -eq 0
+        return 0
+    end
+
+    echo ""
+    echo "✗ "(count $drift)" local edit(s) in ~ are not captured in the source repo."
+    echo "  chezmoi apply would prompt for (or overwrite) them, so cz sync stopped before pulling."
+    echo ""
+    for line in $drift
+        set -l parts (string split -m1 ' ' -- $line)
+        set -l short (string replace -- "$HOME" '~' $parts[2])
+        printf '  %s  %s\n' $parts[1] $short
+        if string match -q '*.tmpl' -- (chezmoi source-path $parts[2] 2>/dev/null)
+            printf '      keep local:   chezmoi merge %s   (template)\n' $short
+        else
+            printf '      keep local:   cz capture %s\n' $short
+        end
+        printf '      keep source:  chezmoi apply --force %s\n' $short
+    end
+    return 1
+end
+
 function cz --description "chezmoi shortcuts"
     switch $argv[1]
         case edit e
             # Open source file in editor, auto-applies on save
             chezmoi edit $argv[2..-1]
-        case sync s
+        case diff d
+            chezmoi diff $argv[2..-1]
+        case capture c
             # Import intentional target drift only when explicit targets are given.
             set -l targets $argv[2..-1]
             if test (count $targets) -eq 0
                 echo "Refusing an unscoped re-add. Pass specific target files:"
-                echo "  cz sync ~/.config/example/config.toml"
+                echo "  cz capture ~/.config/example/config.toml"
                 echo ""
                 chezmoi status
                 return 1
@@ -243,10 +311,39 @@ function cz --description "chezmoi shortcuts"
             read -P "Re-add only these targets to chezmoi source? [y/N] " confirm
             if test "$confirm" = y -o "$confirm" = Y
                 chezmoi re-add $targets
-                echo "✓ Synced selected targets to chezmoi source."
+                echo "✓ Captured in source. Run 'cz sync' to send it."
             end
-        case diff d
-            chezmoi diff $argv[2..-1]
+        case push p
+            __cz_push $argv[2..-1]
+        case sync s
+            if test (count $argv) -gt 1
+                echo "cz sync takes no arguments." >&2
+                echo "  pull local edits into source:  cz capture <target>" >&2
+                echo "  set a commit message:          cz push \"message\"" >&2
+                return 2
+            end
+
+            # 1. send: anything changed in the source repo goes to origin first
+            __cz_push
+            or return 1
+
+            # 2. refuse to receive while ~ holds edits that only exist in ~
+            __cz_drift
+            or return 1
+
+            # 3. receive: pull --autostash --rebase, then apply
+            echo "→ Pulling from origin"
+            if not chezmoi git pull -- --autostash --rebase
+                echo "✗ pull failed — resolve the conflict in "(__cz_source_dir)", then re-run cz sync" >&2
+                return 1
+            end
+
+            echo "→ Applying to ~"
+            if not chezmoi apply
+                echo "✗ apply failed" >&2
+                return 1
+            end
+            echo "✓ In sync."
         case '*'
             command chezmoi $argv
     end
