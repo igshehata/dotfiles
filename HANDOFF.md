@@ -7,7 +7,7 @@ and its `.chezmoiignore` line when step 7 is done.
 
 ## Context: what changed on MacBook-Air
 
-Three commits (unpushed when this was written; on origin by the time you read it):
+Commits, all on origin by the time you read this:
 
 1. `feat: cz sync handshake, omp tracking, machine-local config migration` — new `cz`
    subcommands, the atuin key moved out of the template into machine-local config data
@@ -15,6 +15,10 @@ Three commits (unpushed when this was written; on origin by the time you read it
    new self-migration script, omp config tracked, this machine's zed/hunk/tmux/nvim drift captured.
 2. `feat: track tern settings, capture tailscale + press-and-hold, make pi-hunk path machine-local`
 3. `fix(nix): pin nix-darwin to the release branch that matches nixpkgs`
+4. `fix(fish): push commits that exist but were never pushed` — `cz push` used to report
+   "nothing to send" whenever the working tree was clean, even with commits sitting
+   unpushed. If this machine's `cz` ever looks like it is skipping a send, that is the
+   bug it was guarding against; check `chezmoi git -- rev-list --count "@{u}..HEAD"`.
 
 Nothing was deleted, no `.chezmoiremove`, no `exact_` directories. `chezmoi apply` is
 all-or-nothing (verified), so a failure here cannot leave a half-applied machine.

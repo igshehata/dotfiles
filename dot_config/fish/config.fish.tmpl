@@ -215,28 +215,36 @@ end
 # chezmoi workflow helpers
 function __cz_push --description "Commit and push dotfiles source changes"
     set -l dirty (chezmoi git -- status --porcelain 2>/dev/null)
-    if test (count $dirty) -eq 0
-        echo "✓ Source tree clean — nothing to send."
+    # A clean tree does not mean nothing to send: commits can already exist
+    # locally and never have been pushed. Check the upstream as well.
+    set -l ahead (chezmoi git -- rev-list --count "@{u}..HEAD" 2>/dev/null)
+
+    if test (count $dirty) -eq 0; and test "$ahead" = "0"
+        echo "✓ Source tree clean and in sync with origin — nothing to send."
         return 0
     end
 
-    echo "→ Source changes to send:"
-    chezmoi git -- status --short
+    if test (count $dirty) -gt 0
+        echo "→ Source changes to commit:"
+        chezmoi git -- status --short
+        chezmoi git -- add -A
+        set -l msg $argv[1]
+        if test -z "$msg"
+            set msg "chore(dotfiles): sync from "(hostname)
+        end
+        if not chezmoi git -- commit -q -m "$msg"
+            echo "cz: commit failed" >&2
+            return 1
+        end
+    else
+        echo "→ No local edits; pushing "(string join ' ' $ahead)" existing commit(s)."
+    end
 
-    chezmoi git -- add -A
-    set -l msg $argv[1]
-    if test -z "$msg"
-        set msg "chore(dotfiles): sync from "(hostname)
-    end
-    if not chezmoi git -- commit -q -m "$msg"
-        echo "cz: commit failed" >&2
-        return 1
-    end
     if not chezmoi git -- push
-        echo "cz: push failed" >&2
+        echo "cz: push failed — if origin moved, run 'cz sync' to pull/rebase first" >&2
         return 1
     end
-    echo "✓ Pushed: $msg"
+    echo "✓ Pushed."
 end
 
 function __cz_drift --description "Report local edits in ~ that are not captured in the source repo"
