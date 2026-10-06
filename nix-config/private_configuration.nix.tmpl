@@ -65,6 +65,7 @@
       "obsidian"
       "raycast"
       "superwhisper"
+      "tailscale-app"
 
       # Nerd Fonts
       "font-3270-nerd-font"
@@ -155,6 +156,8 @@
   # macOS System Defaults
   system.defaults = {
     dock.autohide = true;
+    # Disable the character picker that intercepts held keys in terminal editors.
+    NSGlobalDomain.ApplePressAndHoldEnabled = false;
   };
 
   # Nix settings

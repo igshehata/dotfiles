@@ -45,7 +45,10 @@ Classify every change before pushing:
 - **Destructive** — deletions, `.chezmoiremove`, `exact_` directories, scripts that uninstall or move files. The only category that can lose data on another machine, so never ride along with a normal push. Stage it: push the addition, let every machine apply and settle, then push the removal. For anything larger, push to a `next` branch, have each machine `chezmoi git checkout next` and apply, then merge to `main` once every machine is migrated.
 - **Needs a newer chezmoi** — add `.chezmoiversion` so an old machine fails loudly instead of misbehaving.
 
-Default posture: prefer additive changes with fallbacks; never require a machine-local value and consume it in the same commit.
+Default posture: prefer additive changes with fallbacks; never require a machine-local value and consume it in the same commit. Machine-local switches currently in use, both `hasKey`-guarded so an unset value falls back to the portable behaviour:
+
+- `atuin_sync_key` — the atuin sync key (a secret; falls back to 1Password)
+- `pi_hunk_dev_path` — only set on a machine that points pi at a local pi-hunk checkout; absent means the published `npm:pi-hunk`
 
 ## Session Start
 
@@ -93,12 +96,12 @@ chezmoi source-path ~/.config/fish/config.fish
 | **zed** | `~/.config/zed/settings.json` | `~/.config/zed/prompts/` (prompt DB) |
 | **herdr** | `~/.config/herdr/config.toml` | logs, `session*.json`, `release-notes.json`, `.plugins.lock` |
 | atuin | `~/.config/atuin/config.toml` (templated) | `~/.local/share/atuin/` (history, records, key) |
-| **tern** | nothing — see below | everything |
+| **tern** | `~/Library/Application Support/Tern/settings.json` (`private_`) | `web-token`, `host_key`, `daemon.state`, `carly/`, `buffers/`, `notes/`, sockets, locks |
 | 1Password / gh / copilot / docker / kube / raycast | nothing | auth tokens, machine state |
 
 Tool-rewritten config (omp `config.yml`, zed `settings.json`, hunk `config.toml`) drifts whenever the app writes it. That is expected: `cz sync` reports it, `cz capture <target>` imports it.
 
-Tern (`so.stencil.tern`) has **no Homebrew cask** (it is a closed beta distributed outside brew) and writes no user config file — only runtime state in `~/Library/Application Support/Tern/` (sockets, locks, `daemon.state`). Nothing to track; it cannot be declared in `nix-config` casks until a cask exists.
+Tern (`so.stencil.tern`) has **no Homebrew cask** (closed beta, distributed outside brew), so it cannot be declared in `nix-config` casks until one exists — install it by hand on each machine. Its settings *do* live in a file: `~/Library/Application Support/Tern/settings.json` (71 preferences, no absolute paths) and that file is tracked. The app rewrites it, so expect drift. `ssh_private_key`/`ssh_public_key` in it are empty here and are machine-local: on a machine where they are populated, `apply` prompts before overwriting rather than blanking them.
 
 ## Common Tasks
 
@@ -122,5 +125,6 @@ From `~/.config/chezmoi/chezmoi.toml` (machine-local, not in git):
 
 - `{{ .git_name }}`, `{{ .git_work_email }}`, `{{ .git_personal_email }}`
 - `{{ .atuin_sync_key }}` — atuin sync key, sourced from 1Password once per machine
+- `{{ .pi_hunk_dev_path }}` — optional; set only on machines that point pi at a local pi-hunk checkout (absent → `npm:pi-hunk`)
 
 Built in by chezmoi: `{{ .chezmoi.hostname }}`, `{{ .chezmoi.os }}`, `{{ .chezmoi.arch }}`.
