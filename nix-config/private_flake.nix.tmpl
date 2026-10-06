@@ -3,7 +3,11 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    nix-darwin.url = "github:nix-darwin/nix-darwin/master";
+    # Must match nixpkgs below: nixpkgs-unstable <-> nix-darwin master,
+    # nixpkgs-YY.MM <-> nix-darwin-YY.MM. nix-darwin refuses to evaluate a
+    # mismatched pair. Switching to master requires updating nixpkgs in the
+    # same move: nix flake update nixpkgs nix-darwin
+    nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
   };
 
