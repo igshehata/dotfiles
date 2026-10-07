@@ -7,8 +7,7 @@
     "@datadog/opencode-plugin"
   ],
   "permission": {
-    "switch_to_build": "deny",
-    "switch_to_plan": "deny",
+    "datadog_*": "deny",
     "bash": {
       "*": "allow",
       "sudo *": "deny",
@@ -33,6 +32,12 @@
     }
   },
   "mcp": {
+    "datadog": {
+      "type": "remote",
+      "url": "https://mcp.datadoghq.eu/api/unstable/mcp-server/mcp?toolsets=all",
+      "oauth": {},
+      "enabled": true
+    },
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp"
@@ -59,6 +64,13 @@
       "type": "remote",
       "enabled": true,
       "url": "https://mcp.figma.com/mcp"
+    },
+    "maestro": {
+      "type": "local",
+      "command": [
+        "/Users/islam.shehata/.maestro/bin/maestro",
+        "mcp"
+      ]
     }
   }
 }
