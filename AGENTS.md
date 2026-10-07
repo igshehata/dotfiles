@@ -45,10 +45,11 @@ Classify every change before pushing:
 - **Destructive** — deletions, `.chezmoiremove`, `exact_` directories, scripts that uninstall or move files. The only category that can lose data on another machine, so never ride along with a normal push. Stage it: push the addition, let every machine apply and settle, then push the removal. For anything larger, push to a `next` branch, have each machine `chezmoi git checkout next` and apply, then merge to `main` once every machine is migrated.
 - **Needs a newer chezmoi** — add `.chezmoiversion` so an old machine fails loudly instead of misbehaving.
 
-Default posture: prefer additive changes with fallbacks; never require a machine-local value and consume it in the same commit. Machine-local switches currently in use, both `hasKey`-guarded so an unset value falls back to the portable behaviour:
+Default posture: prefer additive changes with fallbacks; never require a machine-local value and consume it in the same commit. Machine-local switches currently in use, all `hasKey`-guarded so an unset value falls back to the portable behaviour:
 
 - `atuin_sync_key` — the atuin sync key (a secret; falls back to 1Password)
 - `pi_hunk_dev_path` — only set on a machine that points pi at a local pi-hunk checkout; absent means the published `npm:pi-hunk`
+- `omp_mcp_work` — work-account MCP entries (`datadog_url`, `figma_client_id`, `figma_client_secret`) rendered into `~/.omp/agent/mcp.json` by `dot_omp/private_agent/private_mcp.json.tmpl`; absent means the public server list only. **The values are credentials — never commit them, and never `cz capture` the rendered mcp.json.**
 
 ## Session Start
 
@@ -92,7 +93,7 @@ chezmoi source-path ~/.config/fish/config.fish
 | Tool | Tracked | Deliberately not tracked |
 |---|---|---|
 | fish / nushell / zsh / tmux / nvim / starship | full config | histories, `fish_variables`, tmux plugins, nvim README/LICENSE |
-| **omp** | `~/.omp/agent/{config.yml,mcp.json,pi-hunk.json}` (`private_`) | `~/.omp/`: dbs, `logs/`, `cache/`, `webcache/`, `sessions/`, `run/`, `blobs/`, `managed-skills/`, `natives/`, `plugins/`, `install-id`, `stats.db*`, `autoqa.db*` |
+| **omp** | `~/.omp/agent/{config.yml,pi-hunk.json}` (`private_`), `mcp.json` (`private_`, templated — work entries come from machine-local data) | `~/.omp/`: dbs, `logs/`, `cache/`, `webcache/`, `sessions/`, `run/`, `blobs/`, `managed-skills/`, `natives/`, `plugins/`, `install-id`, `stats.db*`, `autoqa.db*` |
 | **zed** | `~/.config/zed/settings.json` | `~/.config/zed/prompts/` (prompt DB) |
 | **herdr** | `~/.config/herdr/config.toml` | logs, `session*.json`, `release-notes.json`, `.plugins.lock` |
 | atuin | `~/.config/atuin/config.toml` (templated) | `~/.local/share/atuin/` (history, records, key) |
@@ -126,5 +127,6 @@ From `~/.config/chezmoi/chezmoi.toml` (machine-local, not in git):
 - `{{ .git_name }}`, `{{ .git_work_email }}`, `{{ .git_personal_email }}`
 - `{{ .atuin_sync_key }}` — atuin sync key, sourced from 1Password once per machine
 - `{{ .pi_hunk_dev_path }}` — optional; set only on machines that point pi at a local pi-hunk checkout (absent → `npm:pi-hunk`)
+- `{{ .omp_mcp_work }}` — optional table (`datadog_url`, `figma_client_id`, `figma_client_secret`); absent → `~/.omp/agent/mcp.json` renders the public servers only
 
 Built in by chezmoi: `{{ .chezmoi.hostname }}`, `{{ .chezmoi.os }}`, `{{ .chezmoi.arch }}`.

@@ -12,6 +12,18 @@
     "sequential-thinking": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-    }
+    }{{ if hasKey . "omp_mcp_work" }},
+    "datadog": {
+      "type": "http",
+      "url": {{ .omp_mcp_work.datadog_url | quote }}
+    },
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "oauth": {
+        "clientId": {{ .omp_mcp_work.figma_client_id | quote }},
+        "clientSecret": {{ .omp_mcp_work.figma_client_secret | quote }}
+      }
+    }{{ end }}
   }
 }
