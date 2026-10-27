@@ -3,8 +3,7 @@
   "lsp": true,
   "plugin": [
     "@mohak34/opencode-notifier@latest",
-    "opencode-mermaid-renderer@0.0.1",
-    "@datadog/opencode-plugin"
+    "opencode-mermaid-renderer@0.0.1"
   ],
   "permission": {
     "bash": {
