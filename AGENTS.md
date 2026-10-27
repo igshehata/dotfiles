@@ -72,7 +72,11 @@ Then write/commit source edits from this repo, `chezmoi apply`, and `cz push`.
 | `dot_config/ghostty/config`                 | `~/.config/ghostty/config`                   |
 | `dot_gitconfig.tmpl`                        | `~/.gitconfig`                               |
 | `dot_omp/private_agent/private_config.yml`  | `~/.omp/agent/config.yml` (dir 0700)         |
-| `nix-config/private_configuration.nix.tmpl` | `~/nix-config/configuration.nix`             |
+| `dot_Brewfile`                              | `~/.Brewfile` (Homebrew inventory)           |
+| `dot_config/mise/config.toml`               | `~/.config/mise/config.toml`                 |
+| `nix-config/private_configuration.nix.tmpl` | `~/nix-config/configuration.nix` (macOS settings via nix-darwin, `drs`; macOS only) |
+| `nix-config/private_server.nix`             | `~/nix-config/server.nix` (Linux servers via system-manager, `sms`) |
+| `nix-config/private_flake.nix.tmpl`         | `~/nix-config/flake.nix` (both outputs; `flake.lock` shared and tracked) |
 
 ### Naming rules
 
@@ -96,12 +100,20 @@ chezmoi source-path ~/.config/fish/config.fish
 | **zed** | `~/.config/zed/settings.json` | `~/.config/zed/prompts/` (prompt DB) |
 | **herdr** | `~/.config/herdr/config.toml` | logs, `session*.json`, `release-notes.json`, `.plugins.lock` |
 | atuin | `~/.config/atuin/config.toml` (templated) | `~/.local/share/atuin/` (history, records, key) |
+| **Homebrew** | `~/.Brewfile`: CLI tools for every OS, casks and fonts under `if OS.mac?` | installed-but-undeclared packages (`brew bundle cleanup --global` lists them) |
+| **mise** | `~/.config/mise/config.toml`: languages/runtimes (node, bun, python, go, …) and npm-distributed CLIs (`npm:` entries) | `~/.local/share/mise/` (installs, caches) |
 | **tern** | `~/Library/Application Support/Tern/settings.json` (`private_`) | `web-token`, `host_key`, `daemon.state`, `carly/`, `buffers/`, `notes/`, sockets, locks |
 | 1Password / gh / copilot / docker / kube / raycast | nothing | auth tokens, machine state |
 
 Tool-rewritten config (omp `config.yml`, zed `settings.json`, hunk `config.toml`) drifts whenever the app writes it. That is expected: `cz sync` reports it, `cz capture <target>` imports it.
 
-Tern (`so.stencil.tern`) has **no Homebrew cask** (closed beta, distributed outside brew), so it cannot be declared in `nix-config` casks until one exists — install it by hand on each machine. Its settings *do* live in a file: `~/Library/Application Support/Tern/settings.json` (71 preferences, no absolute paths) and that file is tracked. The app rewrites it, so expect drift. `ssh_private_key`/`ssh_public_key` in it are empty here and are machine-local: on a machine where they are populated, `apply` prompts before overwriting rather than blanking them.
+Linux machines (the Contabo VPS) get everything except `nix-config/configuration.nix` and `Library/` (`.chezmoiignore`, OS-guarded), Homebrew from `/home/linuxbrew/.linuxbrew`, the Brewfile's non-`OS.mac?` part, the same mise languages, and Nix with `~/nix-config/server.nix` applied by system-manager (`sms`; manages only declared packages, `/etc` files and systemd units, never overwrites an existing `/etc` file unless `replaceExisting = true`, no rollback command yet). system-manager's branch must pair with nixpkgs like nix-darwin's (`release-26.05` <-> nixpkgs 26.05). They are never asked for `atuin_sync_key` and render no `sync_key`, so the Mac's shell history never reaches them. Bootstrap or update one with `vps.sh` (run as the sudo user, idempotent; installs Homebrew and Nix, applies the dotfiles and system-manager, sets fish as login shell, then audits SSH/firewall/Tailscale hardening):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/igshehata/dotfiles/main/vps.sh | bash
+```
+
+Tern (`so.stencil.tern`) has **no Homebrew cask** (closed beta, distributed outside brew), so it cannot be declared in `~/.Brewfile` until one exists — install it by hand on each machine. Its settings *do* live in a file: `~/Library/Application Support/Tern/settings.json` (71 preferences, no absolute paths) and that file is tracked. The app rewrites it, so expect drift. `ssh_private_key`/`ssh_public_key` in it are empty here and are machine-local: on a machine where they are populated, `apply` prompts before overwriting rather than blanking them.
 
 ## Common Tasks
 
@@ -109,15 +121,32 @@ Add a fish function: create `dot_config/fish/functions/<name>.fish`, then `chezm
 
 Edit an existing config: edit the source in this repo, then `chezmoi apply`.
 
-Add a nix package — the `nix` fish wrapper edits the chezmoi source directly:
+Add or remove a Homebrew tool or app — `brew add` / `brew drop` (`dot_local/bin/executable_brew-{add,drop}`, Homebrew external commands) install or uninstall it and edit the chezmoi source of `~/.Brewfile`:
 
 ```bash
-nix add <package>        # nix packages
-nix add --brew <pkg>     # homebrew brews
-nix add --cask <pkg>     # homebrew casks
+brew add <formula>          # every OS
+brew add --cask <app>       # recorded as `cask "<app>" if OS.mac?`
+brew drop [--cask] <name>
+cz push
 ```
 
+Other machines install additions on their next apply (`run_onchange_after_15-brew-bundle.sh`, `brew bundle install --global --no-upgrade`). Update one tool with `brew upgrade <formula>` — no rebuild. nix-darwin no longer manages Homebrew; `drs` only applies macOS settings. Agent CLIs (omp, pi, opencode) live in the Brewfile, not mise.
+
 Track a file the app itself rewrites (omp, zed, hunk): `chezmoi add ~/path/to/file` (adds it as source), then `cz push`.
+
+Add a global language/runtime: `mise use -g <tool>@latest` (installs it and rewrites `~/.config/mise/config.toml`), then `cz capture ~/.config/mise/config.toml` and `cz push`. Other machines install it on their next apply (`run_onchange_after_25-mise-install.sh`). `mise upgrade` moves everything to the newest version. Languages and runtimes live in mise, not in Homebrew. mise itself comes from its official installer (`run_once_before_05-install-mise.sh`, update with `mise self-update`), never from Homebrew.
+
+Plugins (the deps of the tools above) follow one rule: each plugin manager's own manifest is tracked, and a `run_onchange` script keyed on that manifest's hash makes every machine match it on apply. Track only the manifest, never the files a plugin manager writes (fisher's `functions/`, `conf.d/`, `completions/` entries, tpm's `plugins/`): tracking both makes every plugin upgrade show up as drift. After adding or upgrading a plugin, `cz capture` the manifest and `cz push`.
+
+| Plugins | Manifest (tracked) | Reconciled by | Pinned? |
+|---|---|---|---|
+| fish (fisher) | `~/.config/fish/fish_plugins` | `31-fish-plugins` — `fisher update` (installs fisher if missing, adds declared, removes undeclared) | No: latest, or pin with `owner/repo@tag` in the manifest |
+| tmux (tpm) | `@plugin` lines in `~/.config/tmux/tmux.conf` | `30-refresh-shell-integrations` — clones tpm, `install_plugins` + `clean_plugins` | No: default branch; upgrade with prefix + U |
+| Neovim (lazy.nvim) | `~/.config/nvim/lazy-lock.json` | `32-nvim-plugins` — `Lazy! restore`, twice, putting the lockfile back between passes (startup installs missing plugins at latest and rewrites the lockfile) | Yes: exact commits. Mason tools and treesitter parsers install on first start |
+| Zed extensions | `auto_install_extensions` in `~/.config/zed/settings.json` | Zed itself, on start | No |
+| pi packages | `packages` in `~/.pi/agent/settings.json` | pi itself | Per package source |
+
+Never use Homebrew's zap (`brew uninstall --zap`, `brew bundle cleanup --zap`, nix-homebrew `cleanup = "zap"`): it deletes an app's settings and data along with the app. `brew drop` uses plain `brew uninstall`.
 
 ## Template Variables
 

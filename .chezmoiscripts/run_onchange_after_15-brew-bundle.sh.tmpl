@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Installs whatever ~/.Brewfile declares and this machine lacks, whenever the
+# Brewfile changes (here or after a pull from another machine). --no-upgrade
+# keeps it fast; upgrades stay a deliberate `brew upgrade`. Never fails an
+# apply: worst case it prints what to run.
+#
+# Brewfile hash: {{ include "dot_Brewfile" | sha256sum }}
+
+set -uo pipefail
+
+brew_bin="$(command -v brew || true)"
+for candidate in /opt/homebrew/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+    [[ -z "$brew_bin" && -x "$candidate" ]] && brew_bin="$candidate"
+done
+
+if [[ -z "$brew_bin" ]]; then
+    echo "chezmoi: Homebrew not found - install it, then run: brew bundle install --global" >&2
+    exit 0
+fi
+
+if ! "$brew_bin" bundle install --global --no-upgrade; then
+    echo "chezmoi: 'brew bundle install --global' failed - rerun it by hand" >&2
+fi
+
+exit 0

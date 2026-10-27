@@ -1,9 +1,20 @@
 if test -x /opt/homebrew/bin/brew
     /opt/homebrew/bin/brew shellenv | source
+else if test -x /home/linuxbrew/.linuxbrew/bin/brew
+    /home/linuxbrew/.linuxbrew/bin/brew shellenv | source
 end
 
+{{ if eq .chezmoi.os "darwin" -}}
 # Nix darwin system binaries
 fish_add_path /run/current-system/sw/bin
+{{- else -}}
+# Nix (Homebrew's fish does not read /etc/fish, where the Nix installer hooks in)
+if test -e /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.fish
+    source /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.fish
+end
+# system-manager packages (environment.systemPackages in ~/nix-config/server.nix)
+test -d /run/system-manager/sw/bin; and fish_add_path /run/system-manager/sw/bin
+{{- end }}
 
 # Local/native installer binaries
 fish_add_path $HOME/.local/bin
@@ -11,7 +22,7 @@ fish_add_path $HOME/.local/bin
 # Rust/Cargo toolchain binaries
 fish_add_path $HOME/.cargo/bin
 
-# Bun runtime
+# Bun global packages (`bun add -g`). bun itself comes from mise.
 set -gx BUN_INSTALL "$HOME/.bun"
 fish_add_path $BUN_INSTALL/bin
 
@@ -23,10 +34,6 @@ if status is-interactive
     bind -M insert \e\x7f backward-kill-word
     # Command+Backspace: delete to start of line (works in vi insert mode)
     bind -M insert \cU backward-kill-line
-
-    if command -q fnm
-        fnm env --use-on-cd | source
-    end
 
     if command -q mise
         mise activate fish | source
@@ -95,7 +102,6 @@ if status is-interactive
     bind -M insert \t _git_push_tab_complete
     bind -M default \t _git_push_tab_complete
 
-    alias ci code-insiders
     alias nv nvim
     alias ?? aichat
     alias ls 'eza -l --no-permissions --icons --git'
@@ -107,109 +113,13 @@ if status is-interactive
     # Python aliases
     alias py=python3
     alias pip=pip3
-
+{{ if eq .chezmoi.os "darwin" }}
     # Nix darwin (requires sudo since May 2025 - Phase 1 of multi-user support)
     abbr --add drs 'sudo darwin-rebuild switch --flake ~/nix-config#{{ .chezmoi.hostname }}'
-end
-
-# nix add/dedupe - Nix configuration helpers
-function nix
-    if test (count $argv) -lt 1
-        echo "Usage: nix <add|dedupe> [--brew|--cask|--nix] [packages...]"
-        return 1
-    end
-
-    set subcommand $argv[1]
-    set packages $argv[2..-1]
-    set config_file (command chezmoi source-path ~/nix-config/configuration.nix)
-
-    switch $subcommand
-        case add
-            # Parse flags
-            set target brew
-            set pkg_list
-
-            for arg in $packages
-                switch $arg
-                    case --brew
-                        set target brew
-                    case --cask
-                        set target cask
-                    case --nix
-                        set target nix
-                    case '*'
-                        set -a pkg_list $arg
-                end
-            end
-
-            if test (count $pkg_list) -lt 1
-                echo "Usage: nix add [--brew|--cask|--nix] <package1> [package2] ..."
-                echo "  (default)  Add to Homebrew brews"
-                echo "  --brew     Add to Homebrew brews"
-                echo "  --cask     Add to Homebrew casks"
-                echo "  --nix      Add to nix packages"
-                return 1
-            end
-
-            for pkg in $pkg_list
-                switch $target
-                    case nix
-                        sed -i '' "/environment.systemPackages = with pkgs; \[/a\\
-    $pkg" $config_file
-                        echo "Added $pkg to nix packages"
-                    case brew
-                        sed -i '' "/brews = \[/a\\
-      \"$pkg\"" $config_file
-                        echo "Added $pkg to brews"
-                    case cask
-                        sed -i '' "/casks = \[/a\\
-      \"$pkg\"" $config_file
-                        echo "Added $pkg to casks"
-                end
-            end
-
-            echo ""
-            switch $target
-                case brew
-                    echo "Inventory updated in chezmoi source."
-                    echo "To use it now, run: brew install "(string join ' ' $pkg_list)
-                case cask
-                    echo "Inventory updated in chezmoi source."
-                    echo "To use it now, run: brew install --cask "(string join ' ' $pkg_list)
-                case nix
-                    echo "Inventory updated in chezmoi source."
-                    echo "Run chezmoi apply when you want ~/nix-config/configuration.nix rendered, then drs when you want full machine reconcile."
-            end
-
-        case dedupe
-            # Extract nix packages (between systemPackages = [ and ];)
-            set nix_pkgs (sed -n '/environment.systemPackages/,/\];/p' $config_file | grep -oE '^\s+\w+' | tr -d ' ')
-
-            # Extract brews (between brews = [ and ];)
-            set brews (sed -n '/brews = \[/,/\];/p' $config_file | grep -oE '"[^"]+"' | tr -d '"')
-
-            set found 0
-            for pkg in $nix_pkgs
-                if contains $pkg $brews
-                    sed -i '' "/brews = \[/,/\];/{ /\"$pkg\"/d; }" $config_file
-                    echo "Removed '$pkg' from brews (exists in nix packages)"
-                    set found (math $found + 1)
-                end
-            end
-
-            if test $found -eq 0
-                echo "No duplicates found"
-            else
-                echo ""
-                echo "Removed $found duplicate(s)"
-                echo "Inventory updated in chezmoi source."
-                echo "Run chezmoi apply when you want ~/nix-config/configuration.nix rendered."
-            end
-
-        case '*'
-            # Pass through to actual nix command
-            command nix $argv
-    end
+{{- else }}
+    # system-manager: apply ~/nix-config systemConfigs.default (pinned by flake.lock)
+    abbr --add sms 'nix run --inputs-from ~/nix-config system-manager -- switch --flake ~/nix-config --sudo'
+{{- end }}
 end
 
 # chezmoi workflow helpers

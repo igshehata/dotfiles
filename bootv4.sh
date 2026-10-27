@@ -217,22 +217,34 @@ phase_3() {
 }
 
 # ============================================================================
-# Phase 4: Homebrew update + darwin-rebuild switch
+# Phase 4: Homebrew + Brewfile + darwin-rebuild switch
 # ============================================================================
 phase_4() {
-    info "Phase 4: Homebrew + darwin-rebuild"
+    info "Phase 4: Homebrew + Brewfile + darwin-rebuild"
 
-    # Ensure homebrew is available
+    # The inventory is a plain (untemplated) file, so read it from the source.
+    local brewfile="$CHEZMOI_SOURCE/dot_Brewfile"
+
     eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || true
 
     if ! command -v brew &>/dev/null; then
-        warn "Homebrew not found — Nix/darwin-rebuild will install it"
-    else
-        info "Updating Homebrew..."
-        brew update || warn "brew update failed — continuing"
-        info "Upgrading existing formulae (skipping casks to avoid stale app-link failures)..."
-        brew upgrade --formula || warn "brew formula upgrade failed — continuing"
+        info "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
+        eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || true
     fi
+
+    if ! command -v brew &>/dev/null; then
+        fail "Homebrew is not available"
+        return 1
+    fi
+
+    info "Updating Homebrew..."
+    brew update || warn "brew update failed — continuing"
+    info "Upgrading existing formulae (skipping casks to avoid stale app-link failures)..."
+    brew upgrade --formula || warn "brew formula upgrade failed — continuing"
+
+    info "Installing the Brewfile inventory..."
+    brew bundle install --file="$brewfile" --no-upgrade </dev/tty || warn "brew bundle install reported failures — continuing"
 
     local rebuild_host="$HOSTNAME"
     if ! grep -q "darwinConfigurations.\"$rebuild_host\"" "$NIX_CONFIG/flake.nix"; then
@@ -263,54 +275,16 @@ phase_4() {
 
     success "darwin-rebuild completed"
 
-    local has_brew=0
-    if command -v brew &>/dev/null; then
-        has_brew=1
+    info "Verifying the Brewfile inventory is installed..."
+    if brew bundle check --file="$brewfile" --no-upgrade --verbose; then
+        track "Homebrew" "Brewfile inventory" "pass"
+    else
+        track "Homebrew" "Brewfile inventory" "fail"
+        warn "Brewfile entries are missing (listed above)"
     fi
 
-    # Verify formulas by brew install state OR command availability in PATH
-    # (some tools are intentionally installed via Nix and won't appear in brew list)
-    info "Verifying CLI tools are available..."
-    local formula_checks=(
-        "agent-browser:agent-browser" "aichat:aichat"
-        "anomalyco/tap/opencode:opencode" "atuin:atuin" "bat:bat"
-        "carapace:carapace" "chezmoi:chezmoi" "eza:eza" "fd:fd"
-        "fish:fish" "fnm:fnm" "fzf:fzf" "gh:gh" "glow:glow"
-        "herdr:herdr" "hunk:hunk" "jj:jj" "jq:jq" "llmfit:llmfit"
-        "mise:mise" "neovim:nvim" "nushell:nu" "ripgrep:rg"
-        "starship:starship" "television:tv" "tmux:tmux"
-        "worktrunk:wt" "zoxide:zoxide"
-    )
-
-    for check in "${formula_checks[@]}"; do
-        local formula="${check%%:*}"
-        local cmd="${check##*:}"
-
-        if { [[ $has_brew -eq 1 ]] && brew list --formula "$formula" &>/dev/null; } || command -v "$cmd" &>/dev/null; then
-            track "Brews" "$formula" "pass"
-        else
-            track "Brews" "$formula" "fail"
-            warn "Tool not found: $formula (expected command: $cmd)"
-        fi
-    done
-
-    local casks=(
-        1password 1password-cli aerospace arc codex discord ghostty
-        google-chrome obsidian raycast superwhisper
-        font-jetbrains-mono-nerd-font
-    )
-
-    for cask in "${casks[@]}"; do
-        if [[ $has_brew -eq 1 ]] && brew list --cask "$cask" &>/dev/null; then
-            track "Casks" "$cask" "pass"
-        else
-            track "Casks" "$cask" "fail"
-            warn "Cask not found: $cask"
-        fi
-    done
-
     # Ghostty cask can be installed while app bundle is missing from /Applications.
-    if [[ $has_brew -eq 1 ]] && brew list --cask ghostty &>/dev/null && [[ ! -d "/Applications/Ghostty.app" ]]; then
+    if brew list --cask ghostty &>/dev/null && [[ ! -d "/Applications/Ghostty.app" ]]; then
         warn "Ghostty cask is installed but /Applications/Ghostty.app is missing — reinstalling cask"
         brew reinstall --cask ghostty || warn "Ghostty reinstall failed"
     fi
@@ -322,7 +296,7 @@ phase_4() {
         warn "Ghostty.app is still missing in /Applications"
     fi
 
-    if [[ $has_brew -eq 1 ]] && brew list --cask raycast &>/dev/null; then
+    if brew list --cask raycast &>/dev/null; then
         info "Raycast state is not synced via dotfiles. Restore it from your private 'Export Settings & Data' bundle after install."
     fi
 

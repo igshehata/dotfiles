@@ -1,5 +1,7 @@
 if [[ -x /opt/homebrew/bin/brew ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 fi
 
 export PATH="/run/current-system/sw/bin:$PATH"
@@ -11,12 +13,11 @@ if [[ -s "$HOME/.bun/_bun" ]]; then
   source "$HOME/.bun/_bun"
 fi
 
-# bun
+# bun global packages (`bun add -g`); bun itself comes from mise
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
 # aliases
-alias ci="code-insiders"
 alias ls="eza -l --no-permissions --icons --git"
 alias ll="eza -la --no-permissions --icons --git"
 alias la="eza -a --icons --git"
@@ -25,19 +26,16 @@ alias llt="eza -lT --no-permissions --icons --level=2 --git"
 alias nv="nvim"
 alias py="python3"
 alias pip="pip3"
+{{ if eq .chezmoi.os "darwin" -}}
 alias drs='sudo darwin-rebuild switch --flake ~/nix-config#{{ .chezmoi.hostname }}'
+{{ else -}}
+alias sms='nix run --inputs-from ~/nix-config system-manager -- switch --flake ~/nix-config --sudo'
+{{ end -}}
 alias purge="git fetch -p"
 alias bathelp='bat --plain --language=help'
 help() {
     "$@" --help 2>&1 | bathelp
 }
-
-# fnm
-FNM_PATH="$HOME/Library/Application Support/fnm"
-if command -v fnm >/dev/null 2>&1 && [[ -d "$FNM_PATH" ]]; then
-  export PATH="$FNM_PATH:$PATH"
-  eval "$(fnm env)"
-fi
 
 # Initialize atuin (history sync)
 if command -v atuin >/dev/null 2>&1; then
@@ -62,9 +60,3 @@ if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh)"
 fi
 export PATH=$PATH:$HOME/.maestro/bin
-
-# Unity CLI — the env file only exists on machines with the Unity toolchain,
-# so this is a no-op everywhere else (keeps the file safe to sync).
-if [[ -f "$HOME/.unity/env" ]]; then
-  source "$HOME/.unity/env"
-fi

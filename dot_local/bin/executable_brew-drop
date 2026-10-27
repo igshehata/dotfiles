@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# brew drop [--cask] <name>...
+#
+# Homebrew external command (`brew drop`): removes formulae (or --cask apps)
+# from ~/.Brewfile by editing its chezmoi source, then uninstalls them here.
+# Other machines keep their copy until uninstalled there; `brew bundle cleanup
+# --global` lists it as undeclared. Publish with `cz push`.
+
+set -euo pipefail
+
+kind=brew
+uninstall_flags=()
+if [[ "${1:-}" == "--cask" ]]; then
+    kind=cask
+    uninstall_flags=(--cask)
+    shift
+fi
+
+if [[ $# -eq 0 ]]; then
+    echo "usage: brew drop [--cask] <name>..." >&2
+    exit 1
+fi
+
+src="$(chezmoi source-path "$HOME/.Brewfile")"
+
+for name in "$@"; do
+    tmp="$(mktemp)"
+    # Drop the exact entry, ignoring indentation and a trailing `if OS.mac?` guard.
+    awk -v want="$kind \"$name\"" '
+        { line = $0; sub(/^[ \t]+/, "", line); sub(/[ \t]+if OS\.mac\?$/, "", line)
+          if (line == want) { dropped = 1; next } print }
+        END { exit !dropped }' "$src" > "$tmp" && status=0 || status=$?
+    if [[ $status -eq 0 ]]; then
+        cat "$tmp" > "$src"
+        echo "removed from ~/.Brewfile: $kind \"$name\""
+    else
+        echo "not in ~/.Brewfile: $kind \"$name\""
+    fi
+    rm -f "$tmp"
+done
+
+chezmoi apply "$HOME/.Brewfile"
+brew uninstall "${uninstall_flags[@]}" "$@"

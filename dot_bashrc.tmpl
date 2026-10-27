@@ -1,14 +1,16 @@
 if [[ -x /opt/homebrew/bin/brew ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 fi
 
 export PATH="/run/current-system/sw/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
+# bun global packages (`bun add -g`); bun itself comes from mise
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
-alias ci="code-insiders"
 alias ls="eza -l --no-permissions --icons --git"
 alias ll="eza -la --no-permissions --icons --git"
 alias la="eza -a --icons --git"
@@ -17,13 +19,11 @@ alias llt="eza -lT --no-permissions --icons --level=2 --git"
 alias nv="nvim"
 alias py="python3"
 alias pip="pip3"
+{{ if eq .chezmoi.os "darwin" -}}
 alias drs='sudo darwin-rebuild switch --flake ~/nix-config#{{ .chezmoi.hostname }}'
-
-FNM_PATH="$HOME/Library/Application Support/fnm"
-if command -v fnm >/dev/null 2>&1 && [[ -d "$FNM_PATH" ]]; then
-  export PATH="$FNM_PATH:$PATH"
-  eval "$(fnm env)"
-fi
+{{ else -}}
+alias sms='nix run --inputs-from ~/nix-config system-manager -- switch --flake ~/nix-config --sudo'
+{{- end }}
 
 if command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init bash)"

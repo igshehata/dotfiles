@@ -1,0 +1,12 @@
+[tools]
+bun = "latest"
+go = "latest"
+"go:golang.org/x/tools/gopls" = "latest"
+java = "temurin"
+lua = "latest"
+node = "latest"
+pnpm = "latest"
+python = "latest"
+rust = "stable"
+uv = "latest"
+zig = "latest"

@@ -25,18 +25,18 @@ if ('/opt/homebrew/bin/brew' | path exists) {
   $env.HOMEBREW_REPOSITORY = '/opt/homebrew'
   $env.PATH = ($env.PATH | split row (char esep) | prepend '/opt/homebrew/sbin' | prepend '/opt/homebrew/bin')
 }
+if ('/home/linuxbrew/.linuxbrew/bin/brew' | path exists) {
+  $env.HOMEBREW_PREFIX = '/home/linuxbrew/.linuxbrew'
+  $env.HOMEBREW_CELLAR = '/home/linuxbrew/.linuxbrew/Cellar'
+  $env.HOMEBREW_REPOSITORY = '/home/linuxbrew/.linuxbrew/Homebrew'
+  $env.PATH = ($env.PATH | split row (char esep) | prepend '/home/linuxbrew/.linuxbrew/sbin' | prepend '/home/linuxbrew/.linuxbrew/bin')
+}
 
 # Nix darwin system binaries
 $env.PATH = ($env.PATH | split row (char esep) | prepend '/run/current-system/sw/bin')
 
 # Claude Code (native installer)
 $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join '.local' 'bin'))
-
-# Initialize fnm (Fast Node Manager)
-if ((which fnm | length) > 0) {
-  fnm env --json | from json | load-env
-  $env.PATH = ($env.PATH | split row (char esep) | prepend $"($env.FNM_MULTISHELL_PATH)/bin")
-}
 
 # Keep generated init scripts in Nu vendor autoload so they are loaded automatically.
 let nu_vendor_autoload = ($nu.data-dir | path join "vendor/autoload")
@@ -64,7 +64,7 @@ if ((which zoxide | length) > 0) {
 $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join '.cargo' 'bin'))
 
 # ============================================================================
-# Bun - Add Bun runtime to PATH
+# Bun global packages (`bun add -g`). bun itself comes from mise.
 # ============================================================================
 $env.BUN_INSTALL = ($env.HOME | path join '.bun')
 $env.PATH = ($env.PATH | split row (char esep) | prepend ($env.BUN_INSTALL | path join 'bin'))

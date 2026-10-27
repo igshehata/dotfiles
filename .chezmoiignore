@@ -1,7 +1,16 @@
 **/.git
 bootv4.sh
+vps.sh
 AGENTS.md
 HANDOFF.md
+
+{{ if ne .chezmoi.os "darwin" -}}
+# macOS-only (Linux machines get shells, editors, CLI configs, Brewfile, mise,
+# and ~/nix-config for system-manager; configuration.nix is the nix-darwin half)
+nix-config/configuration.nix
+Library
+Library/**
+{{ end -}}
 
 # Tool-managed authentication (don't sync these)
 .config/gh/                    # GitHub CLI manages tokens

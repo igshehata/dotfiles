@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Installs the global mise tools whenever ~/.config/mise/config.toml changes,
+# here or after a pull from another machine. Never fails an apply: worst case
+# it prints what to run.
+#
+# config hash: {{ include "dot_config/mise/config.toml" | sha256sum }}
+#
+# lua is built from source and needs readline headers: Homebrew's keg-only
+# `readline` on macOS, `libreadline-dev` on Debian/Ubuntu.
+
+set -uo pipefail
+
+mise_bin="$(command -v mise || echo "${HOME}/.local/bin/mise")"
+if [[ ! -x "$mise_bin" ]]; then
+    echo "chezmoi: mise not found - skipping 'mise install'" >&2
+    exit 0
+fi
+
+if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
+    readline_prefix="$(brew --prefix readline 2>/dev/null || true)"
+    if [[ -n "$readline_prefix" && -d "$readline_prefix/include" ]]; then
+        export CPATH="${readline_prefix}/include${CPATH:+:$CPATH}"
+        export LIBRARY_PATH="${readline_prefix}/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
+    fi
+fi
+
+if ! "$mise_bin" install; then
+    echo "chezmoi: 'mise install' failed - rerun it by hand" >&2
+fi
+
+exit 0

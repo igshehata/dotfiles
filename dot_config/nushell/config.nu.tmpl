@@ -108,15 +108,19 @@ $env.config.completions.external.completer = {|spans|
 # ============================================================================
 # Aliases
 # ============================================================================
-alias ci = code-insiders
 alias ?? = aichat
 alias lt = eza -T --no-permissions --icons --level=2 --git
 alias llt = eza -lT --no-permissions --icons --level=2 --git
 alias py = python3
 alias pip = pip3
 alias nv = nvim
+{{ if eq .chezmoi.os "darwin" -}}
 # Nix darwin (requires sudo since May 2025 - Phase 1 of multi-user support)
 alias drs = sudo darwin-rebuild switch --flake ~/nix-config#{{ .chezmoi.hostname }}
+{{ else -}}
+# system-manager: apply ~/nix-config systemConfigs.default (pinned by flake.lock)
+alias sms = nix run --inputs-from ~/nix-config system-manager -- switch --flake ~/nix-config --sudo
+{{ end -}}
 # ============================================================================
 # Television (tv) - Smart Autocomplete with Fuzzy Finding
 # Ctrl+T: Fuzzy find files, directories, and commands
@@ -176,94 +180,3 @@ $env.config = (
   )
 )
 
-# ============================================================================
-# Nix Helpers
-# ============================================================================
-
-# nix add [--brew|--cask|--nix] <packages...> - Add packages to nix configuration
-def "nix add" [
-    --brew    # Add to Homebrew brews
-    --cask    # Add to Homebrew casks
-    --nix     # Add to nix packages
-    ...packages: string
-] {
-    if ($packages | is-empty) {
-        print "Usage: nix add [--brew|--cask|--nix] <package1> [package2] ..."
-        print "  (default)  Add to Homebrew brews"
-        print "  --brew     Add to Homebrew brews"
-        print "  --cask     Add to Homebrew casks"
-        print "  --nix      Add to nix packages"
-        return
-    }
-
-    let config_file = (^chezmoi source-path ~/nix-config/configuration.nix | str trim)
-
-    for pkg in $packages {
-        if $cask {
-            ^sed -i '' $"/casks = \\[/a\\\n      \"($pkg)\"" $config_file
-            print $"Added ($pkg) to casks"
-        } else if $nix {
-            ^sed -i '' $"/environment.systemPackages = with pkgs; \\[/a\\\n    ($pkg)" $config_file
-            print $"Added ($pkg) to nix packages"
-        } else {
-            ^sed -i '' $"/brews = \\[/a\\\n      \"($pkg)\"" $config_file
-            print $"Added ($pkg) to brews"
-        }
-    }
-
-    print ""
-    if $cask {
-        print "Inventory updated in chezmoi source."
-        print $"To use it now, run: brew install --cask ($packages | str join ' ')"
-    } else if $nix {
-        print "Inventory updated in chezmoi source."
-        print "Run chezmoi apply when you want ~/nix-config/configuration.nix rendered, then drs when you want full machine reconcile."
-    } else {
-        print "Inventory updated in chezmoi source."
-        print $"To use it now, run: brew install ($packages | str join ' ')"
-    }
-}
-
-# nix dedupe - Remove brews that exist in nix packages
-def "nix dedupe" [] {
-    let config_file = (^chezmoi source-path ~/nix-config/configuration.nix | str trim)
-    let content = open $config_file
-
-    # Extract nix packages
-    let nix_pkgs = ($content
-        | parse --regex '(?s)environment\.systemPackages = with pkgs; \[([^\]]+)\]'
-        | get capture0
-        | first
-        | split row "\n"
-        | each { str trim }
-        | where { $in != "" and not ($in | str starts-with "#") }
-    )
-
-    # Extract brews
-    let brews = ($content
-        | parse --regex '(?s)brews = \[([^\]]+)\]'
-        | get capture0
-        | first
-        | split row "\n"
-        | each { str trim | str replace -a '"' '' }
-        | where { $in != "" and not ($in | str starts-with "#") }
-    )
-
-    mut found = 0
-    for pkg in $nix_pkgs {
-        if $pkg in $brews {
-            ^sed -i '' $"/brews = \\[/,/\\];/{ /\"($pkg)\"/d; }" $config_file
-            print $"Removed '($pkg)' from brews \(exists in nix packages\)"
-            $found = $found + 1
-        }
-    }
-
-    if $found == 0 {
-        print "No duplicates found"
-    } else {
-        print ""
-        print $"Removed ($found) duplicate\(s\)"
-        print "Inventory updated in chezmoi source."
-        print "Run chezmoi apply when you want ~/nix-config/configuration.nix rendered."
-    }
-}

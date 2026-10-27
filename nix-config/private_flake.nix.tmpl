@@ -1,20 +1,30 @@
 {
-  description = "Islam's macOS Configuration";
+  description = "Islam's machine configuration: macOS (nix-darwin) and Linux servers (system-manager)";
 
   inputs = {
+    # Everything follows unstable. nix-darwin and system-manager must pair with
+    # nixpkgs (master/main <-> nixpkgs-unstable; release branches <-> YY.MM)
+    # and refuse to evaluate a mismatched pair, so update all three together:
+    #   nix flake update
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    # Must match nixpkgs below: nixpkgs-unstable <-> nix-darwin master,
-    # nixpkgs-YY.MM <-> nix-darwin-YY.MM. nix-darwin refuses to evaluate a
-    # mismatched pair. Switching to master requires updating nixpkgs in the
-    # same move: nix flake update nixpkgs nix-darwin
-    nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
+    nix-darwin.url = "github:nix-darwin/nix-darwin/master";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+    # Linux servers: declarative /etc files, systemd units and packages on
+    # Ubuntu without converting it to NixOS.
+    system-manager.url = "github:numtide/system-manager";
+    system-manager.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nix-darwin, nixpkgs }: {
+  outputs = inputs@{ self, nix-darwin, nixpkgs, system-manager }: {
+    # macOS - applied with `drs`
     darwinConfigurations.{{ .chezmoi.hostname | quote }} = nix-darwin.lib.darwinSystem {
       system = "aarch64-darwin";
       modules = [ ./configuration.nix ];
+    };
+
+    # Linux servers - applied with `sms`
+    systemConfigs.default = system-manager.lib.makeSystemConfig {
+      modules = [ ./server.nix ];
     };
   };
 }

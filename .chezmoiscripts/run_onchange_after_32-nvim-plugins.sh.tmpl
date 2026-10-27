@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Restores Neovim plugins to the exact commits in ~/.config/nvim/lazy-lock.json
+# whenever the lockfile changes, here or after a pull from another machine.
+# lazy.nvim installs missing plugins and checks out the locked commits; it never
+# upgrades here. Upgrade with :Lazy update (it rewrites lazy-lock.json), then
+# `cz capture ~/.config/nvim/lazy-lock.json`. Mason tools and treesitter parsers
+# are not locked: they install on the first interactive start.
+# Never fails an apply: worst case it prints what to run.
+#
+# lazy-lock hash: {{ include "dot_config/nvim/lazy-lock.json" | sha256sum }}
+
+set -uo pipefail
+
+if ! command -v nvim >/dev/null 2>&1; then
+    echo "chezmoi: nvim not found - skipping Neovim plugins" >&2
+    exit 0
+fi
+
+# On a machine missing plugins, lazy.nvim installs them at their latest commit
+# during startup, before `Lazy! restore` runs, and rewrites lazy-lock.json with
+# those commits. So keep the tracked lockfile aside, let the first pass install,
+# put the lockfile back, and restore again to check out the locked commits.
+lock="$HOME/.config/nvim/lazy-lock.json"
+saved="$(mktemp)"
+cp "$lock" "$saved"
+restore() { nvim --headless "+Lazy! restore" +qa >/dev/null 2>&1; }
+restore
+cp "$saved" "$lock"
+if ! restore; then
+    echo "chezmoi: Neovim plugin restore failed - rerun: nvim --headless '+Lazy! restore' +qa" >&2
+fi
+cp "$saved" "$lock"
+rm -f "$saved"
+
+exit 0

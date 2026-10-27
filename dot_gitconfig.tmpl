@@ -4,7 +4,7 @@
 [pull]
 	rebase = false
 [core]
-	editor = code-insiders --wait
+	editor = {{ if eq .chezmoi.os "darwin" }}zed --wait{{ else }}nvim{{ end }}
 	excludesfile = {{ .chezmoi.homeDir }}/.gitignore_global
 
 [delta]

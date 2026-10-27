@@ -24,12 +24,3 @@ if [[ -f "$ghostty_legacy" ]]; then
     ghostty_backup="${ghostty_legacy}.chezmoi.bak.$(date +%Y%m%d%H%M%S)"
     mv "$ghostty_legacy" "$ghostty_backup"
 fi
-
-if command -v fish &>/dev/null && [[ ! -f "$HOME/.config/fish/functions/fisher.fish" ]]; then
-    fish --no-config -c 'curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher' >/dev/null 2>&1 || true
-fi
-
-tpm_dir="$HOME/.config/tmux/plugins/tpm"
-if [[ ! -d "$tpm_dir" ]]; then
-    git clone https://github.com/tmux-plugins/tpm "$tpm_dir" >/dev/null 2>&1 || true
-fi

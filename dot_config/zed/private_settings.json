@@ -7,6 +7,21 @@
 // custom settings, run `zed: open default settings` from the
 // command palette (cmd-shift-p / ctrl-shift-p)
 {
+  // Extensions Zed installs on start when missing (the manifest; add new ones here).
+  "auto_install_extensions": {
+    "catppuccin": true,
+    "catppuccin-icons": true,
+    "dockerfile": true,
+    "html": true,
+    "lua": true,
+    "macos-classic": true,
+    "nix": true,
+    "sql": true,
+    "terraform": true,
+    "tokyo-night": true,
+    "toml": true,
+    "zig": true
+  },
   "show_wrap_guides": true,
   "preferred_line_length": 120,
   "project_panel": {

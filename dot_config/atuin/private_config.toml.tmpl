@@ -35,13 +35,17 @@
 ## Source of truth: 1Password item op://Dev/AtuinSyncKey/notesPlain. Copy it into
 ## ~/.config/chezmoi/chezmoi.toml once per machine so that chezmoi apply/status/diff
 ## never invoke the 1Password CLI (which prompts for Touch ID on every call).
-## The onepasswordRead fallback below exists only for machines that have not been
-## migrated yet - do not remove it until every machine has atuin_sync_key set.
+## The onepasswordRead fallback below exists only for macOS machines that have not
+## been migrated yet - do not remove it until every machine has atuin_sync_key set.
 ## Migrate a machine:  op read op://Dev/AtuinSyncKey/notesPlain
 ##                     then add it as atuin_sync_key in ~/.config/chezmoi/chezmoi.toml
+## Linux machines (servers) get an empty key and no sync_key line: history stays
+## local and the Mac's shell history never reaches them.
 {{ if hasKey . "atuin_sync_key" -}}
+{{ if .atuin_sync_key -}}
 sync_key = {{ .atuin_sync_key | quote }}
-{{ else -}}
+{{ end -}}
+{{ else if eq .chezmoi.os "darwin" -}}
 sync_key = "{{ onepasswordRead "op://Dev/AtuinSyncKey/notesPlain" }}"
 {{ end -}}
 

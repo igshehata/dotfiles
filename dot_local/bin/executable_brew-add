@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# brew add [--cask] <name>...
+#
+# Homebrew external command (`brew add`): installs formulae (or --cask apps)
+# and records them in ~/.Brewfile by editing its chezmoi source, so every
+# machine installs them on its next `chezmoi apply`. Casks are recorded as
+# macOS-only. Publish with `cz push`.
+
+set -euo pipefail
+
+kind=brew
+guard=""
+install_flags=()
+if [[ "${1:-}" == "--cask" ]]; then
+    kind=cask
+    guard=" if OS.mac?"
+    install_flags=(--cask)
+    shift
+fi
+
+if [[ $# -eq 0 ]]; then
+    echo "usage: brew add [--cask] <name>..." >&2
+    exit 1
+fi
+
+src="$(chezmoi source-path "$HOME/.Brewfile")"
+
+# Exact entry match, ignoring indentation and a trailing `if OS.mac?` guard.
+has_entry() {
+    awk -v want="$1" '
+        { line = $0; sub(/^[ \t]+/, "", line); sub(/[ \t]+if OS\.mac\?$/, "", line)
+          if (line == want) found = 1 }
+        END { exit !found }' "$src"
+}
+
+append() {
+    [[ -z "$(tail -c1 "$src")" ]] || echo >> "$src"
+    printf '%s\n' "$1" >> "$src"
+}
+
+# Install first: a typo fails here and never reaches the Brewfile. Names that
+# are already installed are only recorded (no surprise upgrade).
+to_install=()
+for name in "$@"; do
+    brew list "${install_flags[@]}" "$name" >/dev/null 2>&1 || to_install+=("$name")
+done
+if [[ ${#to_install[@]} -gt 0 ]]; then
+    brew install "${install_flags[@]}" "${to_install[@]}"
+fi
+
+for name in "$@"; do
+    if [[ "$name" == */*/* ]]; then
+        tap="${name%/*}"
+        has_entry "tap \"$tap\"" || append "tap \"$tap\"$guard"
+    fi
+    if has_entry "$kind \"$name\""; then
+        echo "already in ~/.Brewfile: $kind \"$name\""
+    else
+        append "$kind \"$name\"$guard"
+        echo "recorded in ~/.Brewfile: $kind \"$name\"$guard"
+    fi
+done
+
+chezmoi apply "$HOME/.Brewfile"
