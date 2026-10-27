@@ -45,10 +45,13 @@ Classify every change before pushing:
 - **Destructive** — deletions, `.chezmoiremove`, `exact_` directories, scripts that uninstall or move files. The only category that can lose data on another machine, so never ride along with a normal push. Stage it: push the addition, let every machine apply and settle, then push the removal. For anything larger, push to a `next` branch, have each machine `chezmoi git checkout next` and apply, then merge to `main` once every machine is migrated.
 - **Needs a newer chezmoi** — add `.chezmoiversion` so an old machine fails loudly instead of misbehaving.
 
-Default posture: prefer additive changes with fallbacks; never require a machine-local value and consume it in the same commit. Machine-local switches currently in use, both `hasKey`-guarded so an unset value falls back to the portable behaviour:
+Default posture: prefer additive changes with fallbacks; never require a machine-local value and consume it in the same commit. Machine-local switches currently in use, all `hasKey`-guarded so an unset value falls back to the portable behaviour:
 
 - `atuin_sync_key` — the atuin sync key (a secret; falls back to 1Password)
 - `pi_hunk_dev_path` — only set on a machine that points pi at a local pi-hunk checkout; absent means the published `npm:pi-hunk`
+- `pi_default_provider`, `pi_default_model` — pi's default model, per machine; absent means pi chooses. Never prompted; `.chezmoi.toml.tmpl` carries them across `chezmoi init`
+
+Work-account config (work models, MCP servers, memory banks, credentials) never goes in this repo, not even templated: the repo is public and shared with personal machines. Keep it machine-local on the work machine.
 
 ## Session Start
 

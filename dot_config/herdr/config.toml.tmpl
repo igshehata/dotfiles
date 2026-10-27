@@ -1,0 +1,11 @@
+onboarding = false
+[terminal]
+{{- if eq .chezmoi.os "darwin" }}
+default_shell = "/opt/homebrew/bin/fish"
+{{- else }}
+default_shell = "/home/linuxbrew/.linuxbrew/bin/fish"
+{{- end }}
+
+[experimental]
+switch_ascii_input_source_in_prefix = true
+pane_history = true

@@ -17,3 +17,9 @@ umask = 0o22
     git_work_email = {{ $git_work_email | quote }}
     git_personal_email = {{ $git_personal_email | quote }}
     atuin_sync_key = {{ $atuin_sync_key | quote }}
+{{- /* Optional machine-local values: never prompted, kept across `chezmoi init`. */}}
+{{- range $key := list "pi_default_provider" "pi_default_model" }}
+{{-   if hasKey $ $key }}
+    {{ $key }} = {{ index $ $key | quote }}
+{{-   end }}
+{{- end }}

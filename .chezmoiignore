@@ -2,7 +2,6 @@
 bootv4.sh
 vps.sh
 AGENTS.md
-HANDOFF.md
 
 {{ if ne .chezmoi.os "darwin" -}}
 # macOS-only (Linux machines get shells, editors, CLI configs, Brewfile, mise,

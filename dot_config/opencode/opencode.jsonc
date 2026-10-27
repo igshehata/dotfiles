@@ -7,8 +7,6 @@
     "@datadog/opencode-plugin"
   ],
   "permission": {
-    "switch_to_build": "deny",
-    "switch_to_plan": "deny",
     "bash": {
       "*": "allow",
       "sudo *": "deny",

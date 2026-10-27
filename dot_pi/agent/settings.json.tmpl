@@ -1,8 +1,12 @@
 {
   "lastChangelogVersion": "0.84.4",
   "theme": "tokyo-night-storm",
-  "defaultProvider": "xai-auth",
-  "defaultModel": "grok-4.6",
+{{- if hasKey . "pi_default_provider" }}
+  "defaultProvider": {{ .pi_default_provider | quote }},
+{{- end }}
+{{- if hasKey . "pi_default_model" }}
+  "defaultModel": {{ .pi_default_model | quote }},
+{{- end }}
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": false,
   "showHardwareCursor": true,
